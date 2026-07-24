@@ -29,6 +29,8 @@
 
 12. **三态流转不可跳级**：`_drafts/`（零门：可解析 + id 唯一 + 中英名 + 占位符清空 + customer 一致 + 0.1.0 锁 + 入口守卫）→ `_staged/`（schema + skeleton + 命名 + 工程字段未篡改 + ≥3 用例 + 依赖闭包 + R16–R22 防空头 + functional runSuite，见 PLAN §21.8）→ 正式发布（release.mjs；released 态另要求 eval harness（eval-report pass）+ 平台 matrix + workflow dry-run）。
 
+13. **能力 body 必含 `## 能力说明` + `## 适用场景` H2 章节**（staged+，R_scenario）。这两个章节是能力清单的 SSOT——README 的能力清单标记块与 `opsforge discover --all` 从中抽取详细说明与适配场景。`README.md` 中 `<!-- opsforge:capability-inventory start -->…end -->` 标记块由 `node tools/inventory.mjs --readme` 自动生成，**禁止手编**；CI `--check-readme` 漂移门控会挡。改了能力后跑 `--readme` 刷新。
+
 13. **品牌隔离**：品牌能力在 `customers/<brand>/packs/`，带 `customer` 字段，`pack` 以品牌 slug 开头，`depends_on` 不得引用其他品牌。通用能力不得依赖品牌能力。
 
 14. **占位符必须清空**：`__FILL_ME__` / `TODO` / `FIXME` 在 staged 全文扫描，0 命中。draft 阶段也清空（§14 草稿区放宽仍执行 R7）。

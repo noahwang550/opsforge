@@ -18,4 +18,17 @@ source:
   origin: original
   upstream_ref: null
 ---
+## 能力说明
+
+活动总结 skill，从多渠道营销活动数据中提取指标，生成结构化复盘报告：关键发现、趋势、异常与建议。支持高管摘要与明细两种格式，可配置时间范围与指标口径，自动比对基准与历史趋势；内置异常告警与定期推送。
+
+## 适用场景
+
+- 大促后活动复盘与汇报
+- 周期性运营例会数据汇总
+- 异动指标归因排查
+- 跨渠道 ROI 对比
+
+## 运行指令
+
 This skill generates activity summaries from marketing campaign data. It processes metrics from multiple channels and produces a structured report with key findings, trends, and recommendations. The skill extracts data from configured sources, aggregates performance indicators, and presents results in a clear format suitable for stakeholders. It supports different report formats including executive summaries and detailed breakdowns. The summary skill also identifies outliers and notable patterns in the activity data for further investigation. Configuration parameters allow customization of time ranges and metric selections per project requirements. The summary skill also generates visual representations of data trends and comparative analysis across different time periods. It supports automated scheduling for recurring reports and alerting when metrics deviate from expected ranges. The skill integrates with notification channels to distribute summaries to relevant stakeholders automatically. Additional features include benchmark comparisons, goal tracking, and historical trend analysis for informed decision making. The skill processes data from multiple marketing platforms including social media, email campaigns, and paid advertising channels. It produces standardized output formats for downstream consumption and archiving purposes.

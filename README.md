@@ -90,6 +90,25 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | codex | 2 | ⚠ 部分（manual-paste/http-inject 回退） |
 | dify | 3 | ❌ 退 manual-paste |
 
+<!-- opsforge:capability-inventory start -->
+## 能力清单（自动生成，请勿手动编辑）
+
+> 由 `node tools/inventory.mjs --readme` 从 registry + 能力 body 的 `## 能力说明` / `## 适用场景` 章节派生。草稿不出现。
+
+### 通用能力
+
+| id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
+|---|---|---|---|---|---|---|
+| `marketing-team.copywriter` | 营销文案写手 | agent | claude-code(T1) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
+| `marketing-team.activity-summary` | 活动总结 | skill | claude-code(T1) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
+| `marketing-team.bi-connector` | BI连接器 | mcp | claude-code(T1) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
+| `marketing-team.campaign-retrospect` | 活动回顾 | workflow | claude-code(T1) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
+
+<!-- opsforge:capability-inventory end -->
+
 ## 文档导览
 
 - [`CLAUDE.md`](CLAUDE.md) — Claude Code 专属补充指令
