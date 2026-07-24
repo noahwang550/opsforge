@@ -1,0 +1,26 @@
+name: opsforge-re-eval
+# Phase 2.7 / §21.8: weekly re-evaluation cron. Re-runs the eval harness against
+# released capabilities to detect model-drift / effectiveness decay. Posts a
+# doctor effectiveness scan; capabilities below 0.7 are flagged for re-eval.
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # weekly Sunday 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+jobs:
+  re-eval:
+    runs-on: ubuntu-latest
+    env:
+      OPSFORGE_RUNNER: static-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - name: Re-evaluate all released capabilities
+        run: node tools/eval.mjs --all
+      - name: Doctor effectiveness scan
+        run: node install.mjs --doctor --platform claude-code

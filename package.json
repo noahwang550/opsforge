@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.0.0 <23.0.0"
   },
-  "description": "OpsForge — 运营能力包仓库工程基线（Phase 0）。",
+  "description": "OpsForge — 运营能力仓库 + 多平台适配器 + 安装器：一次性把能力包安装进任意 AI agent 平台",
   "scripts": {
     "validate": "node tools/validate.mjs --all",
     "new": "node tools/new-capability.mjs",
@@ -20,5 +20,26 @@
   },
   "devDependencies": {
     "markdownlint-cli": "^0.42.0"
-  }
+  },
+  "license": "Apache-2.0",
+  "author": "OpsForge contributors",
+  "homepage": "https://github.com/noahwang550/opsforge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noahwang550/opsforge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/noahwang550/opsforge/issues"
+  },
+  "keywords": [
+    "agent-platform",
+    "claude-code",
+    "cursor",
+    "codex",
+    "cline",
+    "dify",
+    "capabilities",
+    "ops",
+    "vibe-coding"
+  ]
 }
