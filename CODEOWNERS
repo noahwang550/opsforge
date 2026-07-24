@@ -1,0 +1,17 @@
+# CODEOWNERS — 强制 steering 评审关键路径（DESIGN.md §2.11 / §C.4 D3）。
+# 默认所有文件需 steering 评审；以下关键路径显式列出。
+*                                       @opsforge/steering
+/adapters/                              @opsforge/steering
+/tools/                                 @opsforge/steering
+/schema/                                @opsforge/steering
+/templates/                             @opsforge/steering
+/ci/                                    @opsforge/steering
+/AGENTS.md                              @opsforge/steering
+/CLAUDE.md                              @opsforge/steering
+/package.json                           @opsforge/steering
+/package-lock.json                      @opsforge/steering
+/.nvmrc                                 @opsforge/steering
+/registry*.yaml                         @opsforge/steering
+/install.sh                             @opsforge/steering
+/install.mjs                            @opsforge/steering
+/packs/opsforge-meta/                   @opsforge/steering

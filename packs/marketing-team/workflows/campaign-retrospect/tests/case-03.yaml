@@ -1,0 +1,4 @@
+name: case-003
+input:
+  campaign: launch-q1
+expect: human

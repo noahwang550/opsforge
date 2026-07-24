@@ -1,0 +1,5 @@
+name: runtime-install-forward
+input:
+  action: runInstall foo.bar
+expect: contains
+expected: 转发 install.mjs install 并落盘 manifest

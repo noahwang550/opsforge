@@ -1,0 +1,7 @@
+name: case-002
+input:
+  campaign: holiday-2025
+expect: contains
+expected:
+  - retrospect
+  - campaign

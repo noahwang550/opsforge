@@ -1,0 +1,18 @@
+id: __SLUG__.__NAME__            # 脚手架预填，勿改
+version: 0.1.0                   # 脚手架预填，勿改
+kind: agent                      # 脚手架预填，勿改
+pack: __SLUG__                   # 脚手架预填，勿改
+owner: __SLUG__                  # 脚手架预填，勿改
+# customer: __BRAND_SLUG__       # 品牌能力时脚手架取消注释并填值
+display_name: __FILL_ME__
+display_name_zh: __FILL_ME__
+display_name_en: __FILL_ME__
+description: __FILL_ME__
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+depends_on: []
+source:
+  origin: original
+  upstream_ref: null

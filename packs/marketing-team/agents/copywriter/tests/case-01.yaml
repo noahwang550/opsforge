@@ -1,0 +1,5 @@
+name: case-001
+input:
+  topic: summer sale
+expect: exact
+expected: summer sale campaign copy with discount highlights

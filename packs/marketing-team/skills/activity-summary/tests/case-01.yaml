@@ -1,0 +1,5 @@
+name: case-001
+input:
+  period: weekly
+expect: exact
+expected: weekly activity summary with key metrics

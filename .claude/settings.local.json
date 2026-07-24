@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm \"~/.claude/commands/workflow-campaign-retrospect.md\")",
+      "Bash(rmdir \"~/.claude/commands\")",
+      "Bash(rmdir \"~/.claude\")",
+      "Bash(rmdir \"~\")",
+      "Read(//c/Users/noah.wang/**)"
+    ]
+  }
+}

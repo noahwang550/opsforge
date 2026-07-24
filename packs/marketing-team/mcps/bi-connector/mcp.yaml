@@ -1,0 +1,29 @@
+id: marketing-team.bi-connector
+version: 1.0.0
+kind: mcp
+pack: marketing-team
+owner: marketing-team
+display_name: BI Connector
+display_name_zh: BI连接器
+display_name_en: BI Connector
+description: connector mcp that interfaces with business intelligence systems
+platforms:
+  - claude-code
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+transport: stdio
+config_template:
+  auth_schema:
+    - BI_API_KEY
+tools:
+  - name: query-metrics
+    description: Query marketing metrics from BI system
+    inputSchema:
+      type: object
+      properties:
+        metric:
+          type: string
+source:
+  origin: original
+  upstream_ref: null

@@ -1,0 +1,17 @@
+id: opsforge-meta.opsforge
+version: 1.0.0
+kind: agent
+pack: opsforge-meta
+owner: steering
+display_name: OpsForge Top Menu
+display_name_zh: OpsForge 主菜单
+display_name_en: OpsForge Top Menu
+description: top-menu agent that launches the opsforge wizard and routes business authors to capability creation, install, discover, status, doctor, and feedback flows
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+depends_on: []
+source:
+  origin: original
+  upstream_ref: null

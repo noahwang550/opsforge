@@ -1,0 +1,30 @@
+# tools/eval.config.yaml — Phase 2.2 eval harness configuration (§21.4).
+# No new npm deps; judge uses built-in fetch against an OpenAI-compatible endpoint
+# (domestic-model compatible per D4). Endpoint/auth are taken from env vars at runtime.
+
+judge:
+  # OpenAI-compatible chat-completions endpoint. Set via env OPSFORGE_JUDGE_URL.
+  url_env: OPSFORGE_JUDGE_URL
+  # Model id (domestic or international). Set via env OPSFORGE_JUDGE_MODEL.
+  model_env: OPSFORGE_JUDGE_MODEL
+  # Optional bearer key. Set via env OPSFORGE_JUDGE_KEY.
+  key_env: OPSFORGE_JUDGE_KEY
+  # System prompt template path (relative to tools/).
+  prompt: judge-prompt.md
+  temperature: 0
+  response_format: json_object
+
+# 5-axis rubric weights (§21.4). Must sum to 1.0.
+axes:
+  accuracy: 0.30
+  completeness: 0.20
+  actionability: 0.20
+  safety: 0.15
+  robustness: 0.15
+
+# Overall score threshold for a 'pass' verdict.
+threshold: 0.7
+
+# When the runner is static-only (no model), the verdict is 'pending' and these
+# axes are marked runner_limited — they cannot be fully evaluated without execution.
+runner_limited_verdict: pending

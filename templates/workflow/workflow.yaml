@@ -1,0 +1,23 @@
+id: __SLUG__.__NAME__
+version: 0.1.0
+kind: workflow
+pack: __SLUG__
+owner: __SLUG__
+# customer: __BRAND_SLUG__
+display_name: __FILL_ME__
+display_name_zh: __FILL_ME__
+display_name_en: __FILL_ME__
+description: __FILL_ME__
+platforms: [claude-code]
+params_schema: params.schema.json
+steps:
+  - id: __FILL_ME__
+    capability: __FILL_ME__
+    inputs: {}
+    outputs: []
+outputs: {}
+tests: tests/
+changelog: CHANGELOG.md
+source:
+  origin: original
+  upstream_ref: null

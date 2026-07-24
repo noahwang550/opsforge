@@ -1,0 +1,7 @@
+name: case-002
+input:
+  topic: product launch
+expect: contains
+expected:
+  - launch
+  - introducing

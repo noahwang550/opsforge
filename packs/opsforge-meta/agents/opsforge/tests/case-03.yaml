@@ -1,0 +1,5 @@
+name: exit-on-zero
+input:
+  choice: "0"
+expect: exact
+expected: 退出向导并返回主菜单

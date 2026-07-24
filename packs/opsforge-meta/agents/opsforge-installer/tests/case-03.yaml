@@ -1,0 +1,5 @@
+name: registry-priority
+input:
+  action: readRegistry
+expect: exact
+expected: 仓库 registry 优先于 home 副本

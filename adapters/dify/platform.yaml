@@ -1,0 +1,34 @@
+platform: dify
+display_name: Dify
+display_name_zh: Dify
+capability_points:
+  prompt_exec:
+    supported: true
+    mode: http
+  agent_file:
+    supported: false
+    fallback: http-direct
+  skill_file:
+    supported: false
+    fallback: http-direct
+  slash_command:
+    supported: false
+    fallback: manual-paste
+  mcp_config:
+    supported: false
+    fallback: manual-paste
+  workflow_orchestration:
+    supported: false
+    fallback: http-direct
+  config_dir_writable:
+    supported: false
+    fallback: fail-loud
+  kb_mount:
+    supported: false
+    fallback: manual-paste
+  feedback_hook:
+    supported: false
+    fallback: manual-paste
+locale: zh-CN
+compliance_tags: [data-residency-cn]
+verified_by: steering

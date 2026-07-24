@@ -1,0 +1,50 @@
+capabilities:
+  marketing-team.copywriter:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-23'
+        commit: unknown
+    changelog_index: packs/marketing-team/agents/copywriter/CHANGELOG.md
+  marketing-team.bi-connector:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-23'
+        commit: unknown
+    changelog_index: packs/marketing-team/mcps/bi-connector/CHANGELOG.md
+  marketing-team.activity-summary:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-23'
+        commit: unknown
+    changelog_index: packs/marketing-team/skills/activity-summary/CHANGELOG.md
+  marketing-team.campaign-retrospect:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-23'
+        commit: unknown
+    changelog_index: packs/marketing-team/workflows/campaign-retrospect/CHANGELOG.md
+  opsforge-meta.opsforge:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-24'
+        commit: unknown
+    changelog_index: packs/opsforge-meta/agents/opsforge/CHANGELOG.md
+  opsforge-meta.opsforge-installer:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-24'
+        commit: unknown
+    changelog_index: packs/opsforge-meta/agents/opsforge-installer/CHANGELOG.md
+  opsforge-meta.opsforge-wizard:
+    current: 1.0.0
+    history:
+      - version: 1.0.0
+        released_at: '2026-07-24'
+        commit: unknown
+    changelog_index: packs/opsforge-meta/skills/opsforge-wizard/CHANGELOG.md

@@ -1,0 +1,21 @@
+# Dependencies (regenerable via npm install)
+node_modules/
+
+# E2E test scratch (temp homes / manifests / failcaps) — keep e2e-evidence.md only
+.e2e/scratch/
+
+# Third-party intake working dir (drafts land here at runtime)
+.opsforge-intake/
+
+# Runtime state (should never live in the repo; only under ~/.opsforge/)
+opsforge-workdir/
+paste/
+kb/
+manifests/
+.runtime-root.json
+.opsforge-bootstrap.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

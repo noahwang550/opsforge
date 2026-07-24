@@ -1,0 +1,21 @@
+id: __SLUG__.__NAME__
+version: 0.1.0
+kind: mcp
+pack: __SLUG__
+owner: __SLUG__
+# customer: __BRAND_SLUG__
+display_name: __FILL_ME__
+display_name_zh: __FILL_ME__
+display_name_en: __FILL_ME__
+description: __FILL_ME__
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+transport: stdio            # stdio | sse | http
+config_template:
+  auth_schema: []           # 声明需要的 env 变量名，不含密钥
+tools: []                  # 每项 {name, description, inputSchema}
+source:
+  origin: original
+  upstream_ref: null

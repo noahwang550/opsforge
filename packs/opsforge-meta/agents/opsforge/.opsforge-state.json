@@ -1,0 +1,77 @@
+{
+  "state": "registry",
+  "history": [
+    {
+      "ts": "2026-07-24T04:11:58.300Z",
+      "from": null,
+      "to": "draft",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:14:42.789Z",
+      "from": "draft",
+      "to": "staged",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:15:39.326Z",
+      "from": "staged",
+      "to": "released",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:15:39.737Z",
+      "from": "released",
+      "to": "registry",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:18:39.263Z",
+      "from": "registry",
+      "to": "released",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:18:39.567Z",
+      "from": "released",
+      "to": "registry",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:30:44.551Z",
+      "from": "registry",
+      "to": "released",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:30:44.878Z",
+      "from": "released",
+      "to": "registry",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:55:33.490Z",
+      "from": "registry",
+      "to": "released",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T04:55:33.914Z",
+      "from": "released",
+      "to": "registry",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T05:02:06.849Z",
+      "from": "registry",
+      "to": "released",
+      "pr": null
+    },
+    {
+      "ts": "2026-07-24T05:02:07.198Z",
+      "from": "released",
+      "to": "registry",
+      "pr": null
+    }
+  ]
+}

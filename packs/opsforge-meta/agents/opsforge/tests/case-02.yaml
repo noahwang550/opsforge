@@ -1,0 +1,5 @@
+name: invalid-choice-reprompt
+input:
+  choice: "9"
+expect: contains
+expected: 没看懂这个选项

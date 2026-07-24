@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opsforge.dev/schema/upstream-ref.schema.json",
+  "title": "OpsForge upstream reference (§12.1, Phase 2.6 extended)",
+  "description": "第三方收录的上游引用。intake_scope/commercial 字段由 Phase 2.6 增加；additionalProperties:false。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["repo", "commit", "license", "intaked_at", "intaked_by", "commercial", "intake_scope"],
+  "properties": {
+    "repo": { "type": "string", "minLength": 1 },
+    "commit": { "type": "string", "minLength": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "intaked_at": { "type": "string", "minLength": 1 },
+    "intaked_by": { "type": "string", "minLength": 1 },
+    "commercial": { "type": "boolean" },
+    "commercial_reason": { "type": "string" },
+    "intake_scope": {
+      "type": "string",
+      "enum": ["full", "partial", "vendored", "reference"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "commercial": { "const": true } },
+        "required": ["commercial"]
+      },
+      "then": {
+        "required": ["commercial_reason"]
+      }
+    }
+  ]
+}

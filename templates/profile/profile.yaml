@@ -1,0 +1,7 @@
+profile: __SLUG__
+display_name: __FILL_ME__
+display_name_zh: __FILL_ME__
+capabilities:
+  - __FILL_ME__.x@^1.0.0
+workflows: []
+bundles: []

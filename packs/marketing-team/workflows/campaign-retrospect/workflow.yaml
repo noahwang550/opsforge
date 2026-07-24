@@ -1,0 +1,31 @@
+id: marketing-team.campaign-retrospect
+version: 1.0.0
+kind: workflow
+pack: marketing-team
+owner: marketing-team
+display_name: Campaign Retrospect
+display_name_zh: 活动回顾
+display_name_en: Campaign Retrospect
+description: retrospect workflow that reviews campaign performance
+platforms:
+  - claude-code
+params_schema: params.schema.json
+steps:
+  - id: collect-metrics
+    capability: marketing-team.bi-connector
+    inputs:
+      metric: all
+    outputs:
+      - metrics
+  - id: summarize
+    capability: marketing-team.activity-summary
+    inputs:
+      period: campaign
+    outputs:
+      - summary
+outputs: {}
+tests: tests/
+changelog: CHANGELOG.md
+source:
+  origin: original
+  upstream_ref: null

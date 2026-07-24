@@ -1,0 +1,5 @@
+name: menu-launch
+input:
+  prompt: 启动 OpsForge
+expect: contains
+expected: OpsForge 能力工坊

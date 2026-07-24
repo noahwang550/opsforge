@@ -1,0 +1,27 @@
+platform: cursor
+display_name: Cursor
+display_name_zh: Cursor
+capability_points:
+  prompt_exec:
+    supported: true
+    mode: cli
+  agent_file:
+    supported: true
+  skill_file:
+    supported: true
+  slash_command:
+    supported: true
+  mcp_config:
+    supported: true
+  workflow_orchestration:
+    supported: true
+  config_dir_writable:
+    supported: true
+  kb_mount:
+    supported: true
+  feedback_hook:
+    supported: false
+    fallback: manual-paste
+locale: en-US
+compliance_tags: []
+verified_by: steering

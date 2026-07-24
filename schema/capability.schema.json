@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opsforge.dev/schema/capability.schema.json",
+  "title": "OpsForge capability manifest",
+  "description": "能力元数据契约（DESIGN.md §4）。additionalProperties:false 全局生效；条件字段由 if/then 按 kind 注入。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "kind",
+    "pack",
+    "owner",
+    "display_name",
+    "display_name_zh",
+    "display_name_en",
+    "description",
+    "platforms",
+    "tests",
+    "changelog",
+    "source"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,30}\\.[a-z][a-z0-9-]{2,30}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["agent", "skill", "mcp", "workflow", "bundle"]
+    },
+    "pack": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,30}$"
+    },
+    "owner": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,30}$"
+    },
+    "customer": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,30}$"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "display_name_zh": { "type": "string", "minLength": 1 },
+    "display_name_en": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "enum": ["claude-code", "cursor", "codex", "cline", "dify"] }
+    },
+    "entrypoint": { "type": "string", "minLength": 1 },
+    "tests": { "type": "string", "const": "tests/" },
+    "changelog": { "type": "string", "const": "CHANGELOG.md" },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{2,30}\\.[a-z][a-z0-9-]{2,30}@.+"
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin"],
+      "properties": {
+        "origin": { "type": "string", "enum": ["original", "forked"] },
+        "upstream_ref": {
+          "type": ["string", "null"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "origin": { "const": "original" } },
+            "required": ["origin"]
+          },
+          "then": {
+            "properties": { "upstream_ref": { "type": "null" } },
+            "required": ["upstream_ref"]
+          }
+        }
+      ]
+    },
+    "transport": { "type": "string", "enum": ["stdio", "sse", "http"] },
+    "config_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["auth_schema"],
+      "properties": {
+        "auth_schema": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description", "inputSchema"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "inputSchema": { "type": "object" }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "capability", "inputs", "outputs"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "capability": { "type": "string", "minLength": 1 },
+          "inputs": { "type": "object" },
+          "outputs": { "type": "array" }
+        }
+      }
+    },
+    "params_schema": { "type": "string", "const": "params.schema.json" },
+    "outputs": {
+      "comment": "workflow 顶层 outputs 声明（§3.4 模板含 outputs: {}）；§4 未定义其结构，故允许业务作者声明字段。",
+      "type": "object"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{2,30}\\.[a-z][a-z0-9-]{2,30}@.+"
+      }
+    },
+    "workflows": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["point", "severity"],
+        "properties": {
+          "point": { "type": "string", "enum": ["prompt_exec", "agent_file", "skill_file", "slash_command", "mcp_config", "workflow_orchestration", "config_dir_writable", "kb_mount", "feedback_hook"] },
+          "severity": { "type": "string", "enum": ["hard", "soft"] },
+          "fallback": { "type": "string", "enum": ["cli-engine", "http-inject", "manual-paste", "http-direct", "fail-loud"] }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "comment": "agent / skill / mcp 必须声明 entrypoint（workflow / bundle 无 entrypoint）",
+      "if": {
+        "properties": { "kind": { "enum": ["agent", "skill", "mcp"] } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["entrypoint"] }
+    },
+    {
+      "comment": "mcp 必须声明 transport 与 config_template",
+      "if": {
+        "properties": { "kind": { "const": "mcp" } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["transport", "config_template"] }
+    },
+    {
+      "comment": "workflow 必须声明 steps 与 params_schema",
+      "if": {
+        "properties": { "kind": { "const": "workflow" } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["steps", "params_schema"] }
+    },
+    {
+      "comment": "bundle 必须声明 capabilities",
+      "if": {
+        "properties": { "kind": { "const": "bundle" } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["capabilities"] }
+    }
+  ]
+}

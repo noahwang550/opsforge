@@ -1,0 +1,54 @@
+{
+  "id": "opsforge-meta.opsforge-installer",
+  "origin": "original",
+  "axes": {
+    "accuracy": {
+      "score": 0,
+      "n": 0,
+      "pending": true
+    },
+    "completeness": {
+      "score": 0,
+      "n": 3,
+      "pending": true
+    },
+    "actionability": {
+      "score": 0,
+      "n": 0,
+      "pending": true
+    },
+    "safety": {
+      "score": 1,
+      "n": 3
+    },
+    "robustness": {
+      "score": 1,
+      "n": 3
+    }
+  },
+  "overall": 0.3,
+  "threshold": 0.7,
+  "runner": "static-only",
+  "runner_limited": true,
+  "cases": [
+    {
+      "case": "bootstrap-idempotent",
+      "mode": "contains",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    },
+    {
+      "case": "runtime-install-forward",
+      "mode": "contains",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    },
+    {
+      "case": "registry-priority",
+      "mode": "exact",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    }
+  ],
+  "verdict": "pending"
+}

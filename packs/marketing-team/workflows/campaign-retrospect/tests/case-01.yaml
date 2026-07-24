@@ -1,0 +1,5 @@
+name: case-001
+input:
+  campaign: summer-2026
+expect: exact
+expected: retrospect report for summer-2026 campaign

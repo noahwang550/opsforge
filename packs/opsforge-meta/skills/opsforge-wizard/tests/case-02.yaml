@@ -1,0 +1,5 @@
+name: install-5-steps
+input:
+  capId: foo.bar
+expect: contains
+expected: 选平台选拷贝范围确认依赖确认安装

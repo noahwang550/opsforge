@@ -1,0 +1,4 @@
+name: case-003
+input:
+  metric: conversions
+expect: human

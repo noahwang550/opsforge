@@ -1,0 +1,5 @@
+name: discover-from-manifest
+input:
+  action: discover
+expect: exact
+expected: 读 per-project manifest 渲染质量灯与商用标签

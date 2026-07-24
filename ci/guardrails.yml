@@ -1,0 +1,107 @@
+# ci/guardrails.yml — GitHub Actions 路径守卫 + 依赖守卫（DESIGN.md §2.10 / §C.4 / §14）。
+name: opsforge-guardrails
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  path-guard:
+    runs-on: ubuntu-latest
+    # steering 标签的 PR 跳过路径守卫（steering 专属变更）
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'steering') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect steering-owned path violations by business authors
+        id: paths
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            steering-owned:
+              - 'adapters/**'
+              - 'tools/**'
+              - 'tools/opsforge-bootstrap.mjs'
+              - 'tools/opsforge-runtime.mjs'
+              - 'tools/report-templates/**'
+              - 'packs/opsforge-meta/**'
+              - 'schema/**'
+              - 'templates/**'
+              - 'ci/**'
+              - 'ci/github-actions/**'
+              - 'registry*.yaml'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.nvmrc'
+              - 'AGENTS.md'
+              - 'CLAUDE.md'
+              - 'install.sh'
+              - 'install.mjs'
+              - '**/*.mjs'
+              - '**/*.js'
+              - '**/*.sh'
+      - name: Fail on steering-owned path modification
+        if: steps.paths.outputs.steering-owned == 'true'
+        run: |
+          echo "path-guard: one or more steering-owned files were modified by a non-steering PR."
+          echo "Add label 'steering' for steering PRs; otherwise revert these changes."
+          exit 1
+
+  deps-guard:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'deps-change') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check package.json dependency fields unchanged
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD -- package.json | grep -E '^\+\s*("(dependencies|devDependencies)"|"[a-z].*":\s*")' && {
+            echo "deps-guard: package.json dependency fields changed without 'deps-change' label.";
+            echo "Add label 'deps-change' and request steering review.";
+            exit 1;
+          } || echo "deps-guard: no dependency changes detected."
+          exit 0
+
+  entry-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Verify drafts skeleton signatures
+        run: |
+          node tools/validate.mjs --all
+          # entry_guard 在 _drafts/ 下对每个能力目录比对 templates/<kind>/ 签名，
+          # 手建目录会被拒绝（validate.mjs 退出码非 0 即此处 fail）。
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - name: Run validate --all
+        run: node tools/validate.mjs --all
+
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - name: Lint markdown
+        run: npm run lint:md

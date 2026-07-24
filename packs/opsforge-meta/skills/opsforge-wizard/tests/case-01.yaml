@@ -1,0 +1,6 @@
+name: new-capability-flow
+input:
+  kind: skill
+  name: greeter
+expect: contains
+expected: 已创建骨架并引导填写业务字段

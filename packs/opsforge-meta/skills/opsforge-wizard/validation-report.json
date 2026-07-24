@@ -1,0 +1,51 @@
+{
+  "id": "opsforge-meta.opsforge-wizard",
+  "origin": "original",
+  "checks": {
+    "schema": "pass",
+    "yaml_parse": "pass",
+    "id_unique": "pass",
+    "naming": "pass",
+    "version_semver": "pass",
+    "placeholder_clean": "pass",
+    "skeleton_guard": "pass",
+    "engineering_fields_untampered": "pass",
+    "display_names_i18n": "pass",
+    "customer_dir_consistency": "pass",
+    "depends_on_resolvable": "pass",
+    "depends_on_direction": "pass",
+    "tests_min": "pass",
+    "body_min_substance": "pass",
+    "body_not_boilerplate": "pass",
+    "test_expect_nontrivial": "pass",
+    "test_cases_distinct": "pass",
+    "description_body_alignment": "pass",
+    "test_expect_declared": "pass",
+    "no_self_cheat_in_body": "pass",
+    "workflow_ref": "n/a",
+    "workflow_closed": "n/a",
+    "opsforge_state": "pass",
+    "platform_conformance": "pass"
+  },
+  "regression_cases": {
+    "total": 3,
+    "passed": 0,
+    "failed": 0,
+    "pending_human": 3,
+    "modes": {
+      "contains": {
+        "total": 2,
+        "passed": 0,
+        "pending": 2
+      },
+      "exact": {
+        "total": 1,
+        "passed": 0,
+        "pending": 1
+      }
+    },
+    "runner": "static-only",
+    "failures": []
+  },
+  "verdict": "pass"
+}

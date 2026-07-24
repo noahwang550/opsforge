@@ -1,0 +1,21 @@
+name: opsforge-test
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      OPSFORGE_RUNNER: static-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - name: Run unit tests
+        run: node --test "tools/*.test.mjs" "adapters/**/*.test.mjs" "install.test.mjs"
+      - name: Run functional test-runner
+        run: node tools/test-runner.mjs --all

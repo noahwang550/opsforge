@@ -1,0 +1,54 @@
+{
+  "id": "opsforge-meta.opsforge-wizard",
+  "origin": "original",
+  "axes": {
+    "accuracy": {
+      "score": 0,
+      "n": 0,
+      "pending": true
+    },
+    "completeness": {
+      "score": 0,
+      "n": 3,
+      "pending": true
+    },
+    "actionability": {
+      "score": 0,
+      "n": 0,
+      "pending": true
+    },
+    "safety": {
+      "score": 1,
+      "n": 3
+    },
+    "robustness": {
+      "score": 1,
+      "n": 3
+    }
+  },
+  "overall": 0.3,
+  "threshold": 0.7,
+  "runner": "static-only",
+  "runner_limited": true,
+  "cases": [
+    {
+      "case": "new-capability-flow",
+      "mode": "contains",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    },
+    {
+      "case": "install-5-steps",
+      "mode": "contains",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    },
+    {
+      "case": "discover-from-manifest",
+      "mode": "exact",
+      "pass": "pending",
+      "reason": "static-only mode: no model execution"
+    }
+  ],
+  "verdict": "pending"
+}

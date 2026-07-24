@@ -1,0 +1,7 @@
+name: case-002
+input:
+  period: monthly
+expect: contains
+expected:
+  - monthly
+  - metrics

@@ -1,0 +1,31 @@
+platform: cline
+display_name: Cline
+display_name_zh: Cline
+capability_points:
+  prompt_exec:
+    supported: true
+    mode: cli
+  agent_file:
+    supported: true
+  skill_file:
+    supported: false
+    fallback: manual-paste
+  slash_command:
+    supported: false
+    fallback: manual-paste
+  mcp_config:
+    supported: true
+  workflow_orchestration:
+    supported: false
+    fallback: manual-paste
+  config_dir_writable:
+    supported: true
+  kb_mount:
+    supported: false
+    fallback: manual-paste
+  feedback_hook:
+    supported: false
+    fallback: manual-paste
+locale: en-US
+compliance_tags: []
+verified_by: steering

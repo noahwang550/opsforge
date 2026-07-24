@@ -1,0 +1,24 @@
+{
+  "name": "opsforge",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22.0.0 <23.0.0"
+  },
+  "description": "OpsForge — 运营能力包仓库工程基线（Phase 0）。",
+  "scripts": {
+    "validate": "node tools/validate.mjs --all",
+    "new": "node tools/new-capability.mjs",
+    "test": "node --test",
+    "lint:md": "markdownlint '**/*.md'"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "js-yaml": "^4.1.0",
+    "semver": "^7.6.0"
+  },
+  "devDependencies": {
+    "markdownlint-cli": "^0.42.0"
+  }
+}

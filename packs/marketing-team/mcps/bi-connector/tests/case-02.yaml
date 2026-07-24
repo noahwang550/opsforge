@@ -1,0 +1,7 @@
+name: case-002
+input:
+  metric: clicks
+expect: contains
+expected:
+  - metric
+  - clicks
