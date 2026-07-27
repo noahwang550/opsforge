@@ -1,0 +1,28 @@
+# Dependencies — never lint vendored docs.
+node_modules/
+
+# Frozen historical design archives (records, not live contributor docs).
+docs/
+
+# Render templates consumed by tools/report-renderer.mjs (intentional <details>/<summary>
+# HTML for collapsible report sections — not prose docs, MD033 does not apply).
+tools/report-templates/
+
+# Capability body files are agent/skill/mcp system-prompt bodies (YAML frontmatter +
+# prompt text), not prose docs — MD041 (first-line H1) / MD036 (emphasis-as-heading)
+# structurally do not apply. Their quality gate is validate.mjs (R16–R22 + R_scenario),
+# not markdownlint.
+**/source.md
+**/SKILL.md
+templates/
+
+# Steering-authored internal design records. Linting them flags legitimate style
+# (bold sub-section labels, angle-bracket placeholders, language-less code sketches)
+# that the authors chose deliberately. Exempt; the markdownlint job enforces on
+# contributor-facing docs (README / AGENTS / CLAUDE / packs READMEs) instead.
+DESIGN.md
+PLAN.md
+PROGRESS.md
+IMPLEMENTATION-PLAN.md
+UX-PLAN-V2.md
+ARCHITECTURE-DELTA.md
