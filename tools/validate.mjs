@@ -27,7 +27,13 @@ const PLACEHOLDER_TOKENS = ['__FILL_ME__', 'TODO', 'FIXME'];
 
 // §5.5 .opsforge-state.json + report artifacts skeleton-guard exclusion — runtime overlays.
 // Phase 2.2: eval-report.json is the 3rd CI artifact (§21.4), also excluded.
-const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json'];
+// Phase 4 P1-D: benchmark-report.json is advisory (not in release gate) but must be
+// excluded from skeleton_guard to avoid R8 false positive.
+const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json'];
+/** Test hook: returns the current exclusions list (read-only snapshot). */
+export function SKELETON_GUARD_EXCLUSIONS_GET() {
+  return [...SKELETON_GUARD_EXCLUSIONS];
+}
 
 // ---------- 工具 ----------
 function toPosix(p) { return p.split(path.sep).join('/'); }
@@ -524,6 +530,12 @@ export function checkTestExpectNontrivial(cap) {
         return { name: 'test_expect_nontrivial', status: 'fail', detail: `test_expect_nontrivial: ${c.file} llm_judge requires judge_rubric ≥20 chars, got ${rubric.length}` };
       }
     }
+    // Phase 4 P1-B: expect=check requires expected to be a non-empty object.
+    if (exp === 'check') {
+      if (!c.expected || typeof c.expected !== 'object' || Array.isArray(c.expected) || Object.keys(c.expected).length === 0) {
+        return { name: 'test_expect_nontrivial', status: 'fail', detail: `test_expect_nontrivial: ${c.file} expect=check requires expected to be a non-empty object` };
+      }
+    }
     if (c.expected !== undefined && c.expected !== null) {
       const s = String(c.expected);
       if (s.length <= 3) {
@@ -533,8 +545,44 @@ export function checkTestExpectNontrivial(cap) {
         return { name: 'test_expect_nontrivial', status: 'fail', detail: `test_expect_nontrivial: ${c.file} expected "${s}" is in blacklist` };
       }
     }
+    // Phase 4 P0-A: each pre_gate.expected must be non-trivial (same R18 standard).
+    if (Array.isArray(c.pre_gates)) {
+      for (let i = 0; i < c.pre_gates.length; i++) {
+        const g = c.pre_gates[i];
+        if (!g || g.expected === undefined || g.expected === null) continue;
+        const ge = Array.isArray(g.expected) ? g.expected.join(' ') : String(g.expected);
+        if (ge.length <= 3) {
+          return { name: 'test_expect_nontrivial', status: 'fail', detail: `test_expect_nontrivial: ${c.file} pre_gates[${i}].expected too short (${ge.length} chars, need >3)` };
+        }
+        if (EXPECT_BLACKLIST.has(ge.toLowerCase().trim())) {
+          return { name: 'test_expect_nontrivial', status: 'fail', detail: `test_expect_nontrivial: ${c.file} pre_gates[${i}].expected "${ge}" is in blacklist` };
+        }
+      }
+    }
   }
   return { name: 'test_expect_nontrivial', status: 'pass', detail: '' };
+}
+
+// Phase 4 P0-A: pre_gates structural validity (staged+; sibling to R18).
+export function checkPreGatesNontrivial(cap) {
+  const cases = readTestCases(cap);
+  const VALID_MODES = new Set(['contains', 'regex', 'exact', 'files_exist']);
+  for (const c of cases) {
+    if (!Array.isArray(c.pre_gates) || c.pre_gates.length === 0) continue;
+    for (let i = 0; i < c.pre_gates.length; i++) {
+      const g = c.pre_gates[i];
+      if (!g || typeof g !== 'object') {
+        return { name: 'pre_gates_nontrivial', status: 'fail', detail: `pre_gates_nontrivial: ${c.file} pre_gates[${i}] not object` };
+      }
+      if (!VALID_MODES.has(g.mode)) {
+        return { name: 'pre_gates_nontrivial', status: 'fail', detail: `pre_gates_nontrivial: ${c.file} pre_gates[${i}].mode "${g.mode}" invalid` };
+      }
+      if (g.expected === undefined || g.expected === null || g.expected === '') {
+        return { name: 'pre_gates_nontrivial', status: 'fail', detail: `pre_gates_nontrivial: ${c.file} pre_gates[${i}].expected empty` };
+      }
+    }
+  }
+  return { name: 'pre_gates_nontrivial', status: 'pass', detail: '' };
 }
 
 // R19 test_cases_distinct
@@ -542,13 +590,37 @@ export function checkTestCasesDistinct(cap) {
   const cases = readTestCases(cap);
   const seen = new Map();
   for (const c of cases) {
-    const key = JSON.stringify({ input: c.input, expect: c.expect, expected: c.expected });
+    // Phase 4 P1-A: include turns in the distinct key so that two cases with
+    // identical (input, expect, expected) but different turns are considered distinct.
+    const key = JSON.stringify({ input: c.input, expect: c.expect, expected: c.expected, turns: c.turns || [] });
     if (seen.has(key)) {
-      return { name: 'test_cases_distinct', status: 'fail', detail: `test_cases_distinct: ${c.file} duplicates ${seen.get(key)} on (input, expect, expected)` };
+      return { name: 'test_cases_distinct', status: 'fail', detail: `test_cases_distinct: ${c.file} duplicates ${seen.get(key)} on (input, expect, expected, turns)` };
     }
     seen.set(key, c.file);
   }
   return { name: 'test_cases_distinct', status: 'pass', detail: '' };
+}
+
+// R23 test_turns_well_formed (Phase 4 P1-A; staged+ sibling to R16-R22)
+export function checkTurnsWellFormed(cap) {
+  const cases = readTestCases(cap);
+  for (const c of cases) {
+    if (!Array.isArray(c.turns) || c.turns.length === 0) continue;
+    for (let i = 0; i < c.turns.length; i++) {
+      const t = c.turns[i];
+      if (!t || typeof t !== 'object') return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}] not object` };
+      if (!['user', 'assistant'].includes(t.role)) return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}].role invalid` };
+      if (typeof t.content !== 'string' || t.content.length < 1) return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}].content empty` };
+      if (t.post_condition) {
+        if (!Array.isArray(t.post_condition.must_contain_any) || t.post_condition.must_contain_any.length === 0) return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}].post_condition.must_contain_any empty` };
+        for (const s of t.post_condition.must_contain_any) {
+          if (typeof s !== 'string' || s.length < 3) return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}] must_contain_any item <3 chars` };
+        }
+        if (!['skip', 'fail'].includes(t.post_condition.on_fail)) return { name: 'test_turns_well_formed', status: 'fail', detail: `test_turns_well_formed: ${c.file} turn[${i}].post_condition.on_fail invalid` };
+      }
+    }
+  }
+  return { name: 'test_turns_well_formed', status: 'pass', detail: '' };
 }
 
 // R20 description_body_alignment
@@ -846,7 +918,9 @@ export function validateDir(dir, opts = {}) {
   checks.push(checkBodyMinSubstance(cap));
   checks.push(checkBodyNotBoilerplate(cap));
   checks.push(checkTestExpectNontrivial(cap));
+  checks.push(checkPreGatesNontrivial(cap));
   checks.push(checkTestCasesDistinct(cap));
+  checks.push(checkTurnsWellFormed(cap));
   checks.push(checkDescriptionBodyAlignment(cap));
   checks.push(checkTestExpectDeclared(cap));
   checks.push(checkNoSelfCheatInBody(cap));

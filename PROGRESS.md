@@ -1,4 +1,4 @@
-# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6
+# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合)
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
 > **Last Updated:** 2026-07-27
@@ -258,6 +258,85 @@ Phase 3.6 closed the v9 UX shell debt that Phase 2.5 had deferred. Delivered by 
 - `cmdDiscover` feedback jsonl + eval-history 综合聚合的完整语义仍留 Phase 3.2 渐进增强（本轮 discover 已改读 manifest + 质量灯骨架，feedback 聚合的最简实现已落地，深度聚合留 3.2）。
 - 无仓库机器的发行版打包（含 `node_modules`）留后续 Phase。
 
+## Phase 4 第一刀 — skill-up 融合（SHIPPED 2026-07-27）
+
+Phase 4 第一刀（skill-up 融合）由 6-agent 流水线（planner→architect→tdd-guide→e2e-runner→code-reviewer→fix-pass）交付：把 `alibaba/skill-up` 的可吸收概念内化进 OpsForge v8 harness，**不引 Go 二进制**（skill-up 的 Go CLI 与 pinned baseline §C.1 硬冲突，内化思想为 Node 实现，保留全部治理严格度，零新依赖）。bare `node --test` 341 → **424** (+47)；6 gates 全绿（7 capabilities 不变）。零新 npm 依赖；所有新文件是 steering-owned ESM `.mjs` + `.md`/`.yaml`/`.json`。
+
+### 8 slice 实际交付（全 P0+P1+P2）
+
+1. **Slice 1a — `expect` pre_gates（两阶段门）**。`schema/test-case.schema.json` 加 `pre_gates`（可选）：pre_gates 失败则跳过 llm_judge，省 judge 成本、防虚假通过。`tools/test-runner.mjs` `runPreGates` 实现。
+2. **Slice 1b — 回归闭环（`tools/regression-sink.mjs`）**。失败/反馈 → 自动沉淀回归用例草稿到 `_drafts/`，留 `__FILL_ME__`，经 `new-capability.mjs --promote` 人工 gate（不自动 promote，R7 挡 placeholder）。CJK-tolerant slugify（djb2 hash 兜底，零新依赖）。
+3. **Slice 2a — 多轮 `turns` + `post_condition`（R23）**。`schema/test-case.schema.json` 加 `turns`（user/assistant 交替）+ `post_condition`。`tools/test-runner.mjs` `executeMultiTurnDryRun`。`tools/validate.mjs` R23 `checkTurnsWellFormed`（同级新增，R16–R22 不弱化）+ R18 扩展 pre_gates+check。
+4. **Slice 2b — `expect=check`（结构化断言）**。`expect` enum +`check`（`tool_called`/`files_exist`）。`tools/test-runner.mjs` `compareCheck`。
+5. **Slice 2c — evals.json 双向桥接（`tools/evals-bridge.mjs`）**。Anthropic evals.json import/export；导入落 `_drafts/`（留 `__FILL_ME__`）；comparator map 双向。
+6. **Slice 2d — benchmark with/without skill（`tools/benchmark.mjs`，advisory）**。runSuite 跑两次（with-skill + without-skill）算 delta → `benchmark-report.json`。**advisory only，不入 release gate**；`benchmark-report.json` 由 `SKELETON_GUARD_EXCLUSIONS` 豁免。`runSuite` 可注入（测试用 mock 依赖，不复制实现）。
+7. **Slice 3a — 多 engine 分派**。`tools/test-runner.mjs` `OPSFORGE_RUNNER=<platform>` 经 adapter HTTP API 跑 prompt（Tier2/3 多平台：cursor/codex/cline）+ `baselineSystemPrompt`（无 skill 基线 prompt）。
+8. **Slice 3b — `--iteration N` eval-history 归档**。`tools/eval.mjs` `--iteration N` + `failures.jsonl` 归档 + `evaluateCap` 可注入 runSuite。`tools/paths.mjs` 加 `resolveEvalHistory*`；`tools/eval.config.yaml` 加 benchmark 桵；`templates/skill/tests/case-01.yaml` 加 pre_gates 注释示例。`tools/opsforge.mjs` 加 4 子命令 `evolve`/`evals-import`/`evals-export`/`benchmark`。
+
+### 新增/扩展文件（实际）
+
+- 新增 `.mjs`：`tools/regression-sink.mjs`、`tools/evals-bridge.mjs`、`tools/benchmark.mjs`。
+- 新增测试：`tools/test-pre-gates.test.mjs`、`tools/test-regression-sink.test.mjs`、`tools/test-turns.test.mjs`、`tools/test-check-mode.test.mjs`、`tools/test-evals-bridge.test.mjs`、`tools/test-benchmark.test.mjs`、`tools/test-multi-engine.test.mjs`、`tools/test-eval-iteration.test.mjs`（共 8 个，+47 cases）。
+- 改：`schema/test-case.schema.json`（+`pre_gates`/`turns`/`post_condition`/`expect:check`，全 `additionalProperties:false`）、`tools/test-runner.mjs`（runPreGates/compareCheck/executeMultiTurnDryRun/executeCliDryRun 多 engine 分派/baselineSystemPrompt）、`tools/validate.mjs`（R18 扩展 + R23 + SKELETON_GUARD_EXCLUSIONS 加 benchmark-report.json）、`tools/eval.mjs`（failures.jsonl + `--iteration N` + evaluateCap 可注入 runSuite）、`tools/opsforge.mjs`（4 子命令）、`tools/paths.mjs`（resolveEvalHistory*）、`tools/eval.config.yaml`（benchmark 桵）、`templates/skill/tests/case-01.yaml`（pre_gates 注释示例）。
+- 设计文档：`docs/design-archive/skillup-intel.md` + `phase4-skillup-fusion-plan.md` + `phase4-architecture.md`。
+
+### 关键不变量（全守住）
+
+- 不引新 npm 依赖（`package.json` deps 仍 `ajv`/`js-yaml`/`semver`）。
+- `additionalProperties:false` 全保留（test-case schema 扩字段全 optional）。
+- `registry*.yaml` auto-gen 不动（`release.mjs` 三报告 gate 逻辑不变）。
+- 贡献者只写 `.md/.yaml/.json`；回归草稿必经 `--promote`（留 `__FILL_ME__`，R7 挡）。
+- Windows 兼容；R16–R22 不弱化 + R23 同级新增；release gate 三报告逻辑不动；`benchmark-report.json` advisory。
+
+### Final test & validation status (Phase 4 skill-up 融合)
+
+- **Tests:** **424/424 green** via bare `node --test` (0 fail, 0 cancelled, 0 skipped). Suite = Phase 3.6 的 341 + **47 new cases from Phase 4**: `test-pre-gates`（两阶段门，pre_gates 失败省 judge）、`test-regression-sink`（失败→草稿 + CJK slugify + `--promote` gate）、`test-turns`（多轮 + post_condition + R23）、`test-check-mode`（tool_called/files_exist）、`test-evals-bridge`（import/export 双向 + comparator map）、`test-benchmark`（with/without delta + runSuite 注入 + advisory）、`test-multi-engine`（OPSFORGE_RUNNER 分派）、`test-eval-iteration`（--iteration N + failures.jsonl）。
+- **`validate.mjs --all`:** exit 0, `verdict: pass (7 capability(ies))`（R18 扩展 + R23 同级新增生效）。
+- **`security-scan.mjs --all`:** exit 0, 0 findings。
+- **`eval.mjs --all`:** exit 0, 7 caps verdict `pending` at overall=0.3（无 live-model run；`--iteration N` + `failures.jsonl` 归档路径 wired）。
+- **`release.mjs --all`:** exit 0, registry 7 capabilities（三报告 gate 不变；benchmark-report.json advisory 不入 gate）。
+- **`install.mjs --doctor --platform claude-code`:** `healthy: true`, exit 0。
+- **Zero residual:** code-reviewer + fix-pass 闭环所有发现（含 #1 assistant-turn post_condition 静默跳过、#2 RS10/IT2 复制实现、#3 TU5 mock 泄漏、#4 flag 解析未剥离 argv、#5 untrusted text 进 draft yaml）。
+
+## Lessons learned (Phase 4 skill-up 融合)
+
+Distilled from review/fix-pass。每条：现象 → Why it matters → How to apply。
+
+### l. e2e 全绿 ≠ 代码无 bug（测试覆盖要覆盖 schema 允许的全部规范用法）
+- **现象：** e2e-runner 45 E2E 断言全 pass 却没发现 #1（assistant-turn `post_condition` 静默跳过导致虚假通过），因为没有任何 fixture 把 pc 放在 assistant turn 上。
+- **Why：** R23 只校验结构（turns 形态合规）不校验语义（post_condition 真的被执行）；canonical 模式没有运行时断言兜底。
+- **How to apply：** 测试覆盖要覆盖 schema 允许的全部规范用法，不只 happy path；canonical 模式必须有运行时断言；结构校验（R-rule）与语义校验（runSuite 断言）是两层，缺一不可。
+
+### m. 测试复制生产逻辑是 silent-regression 陷阱
+- **现象：** RS10/IT2 重实现 `evaluateCap` 归档逻辑而非调真函数，生产改了测试不红。
+- **Why：** 在测试里复制实现 = 测的是副本不是生产；生产逻辑变更时副本不跟，测试空转。
+- **How to apply：** 测真函数 + 注入 mock 依赖（仿 `benchmark.mjs` runSuite 注入模式），不在测试里复制实现。
+
+### n. mock 资源泄漏
+- **现象：** TU5 `_setSpawn` 不在 try/finally，拒绝时泄漏（测试进程间 spawn 污染）。
+- **Why：** mock 全局资源（spawn/env/fs）若不还原，后续测试读到脏状态。
+- **How to apply：** mock 全局资源必 try/finally 还原；`beforeEach` setup + `afterEach` teardown 成对。
+
+### o. flag 解析不剥离 argv
+- **现象：** `parseIterationFlag` 读 `--iteration` flag 但 main 仍 dispatch `argv[0]`，flag-leading 形态误分发到未知子命令。
+- **Why：** flag 解析后 argv 仍含 flag，dispatch 基于 argv[0] 会错。
+- **How to apply：** flag 解析后必须从 argv 剥离再 dispatch；或用统一的 arg parser（positional + flag 分离）。
+
+### p. untrusted text 进 draft yaml
+- **现象：** feedback/evals.json 字段逐字进 draft yaml，§B 只 staged+ 扫（draft 期无注入扫描）。
+- **Why：** draft 期 untrusted text 已落盘，作者/自动化 promote 时若不识别可被注入。
+- **How to apply：** 生成 draft 时用 `<UNTRUSTED_*>` delimiter 包裹 untrusted 字段，作者有警示、未来自动化 promote 可识别。
+
+### q. planner 初评的事实修正
+- **现象：** planner 初评基于 CLAUDE.md 标签（"test-case 7 字段"）而非真 schema；实际 schema 10 字段（新增可选字段成本低，远低于"扩 schema"的直觉）。eval-history 是空壳须做实（回归闭环生根点）。
+- **Why：** 初评不读真 schema/code 只信文档标签，会高估成本/低估价值，漏掉低成本高收益的切片。
+- **How to apply：** 初评要读真 schema/code（grep + 读关键行号），不只信 CLAUDE.md 标签；标签是"意图"，schema 是"事实"。
+
+### r. 不引 Go 二进制是正确决策
+- **现象：** skill-up 的 Go CLI 与 pinned baseline §C.1（Node 22 ESM `.mjs`，唯一 sh 例外是 `install.sh`）硬冲突；内化思想为 Node 实现保留全部治理严格度，零新依赖。
+- **Why：** 引 Go 二进制会破 §C.1 pinned baseline + 增加贡献者环境复杂度 + 绕过 OpsForge 自身 gate（Go 代码不被 validate/security-scan/eval 覆盖）。
+- **How to apply：** 外部工具的思想可内化（Node 实现），但二进制本身不进仓库；保持 pinned baseline 单一语言栈是首要不变量。
+
 ### Final test & validation status (Phase 2 + Phase 3 + Phase 3.6)
 
 - **Tests:** **341/341 green** via bare `node --test` (0 fail, 0 cancelled, 0 skipped). Suite = Phase 2+3's 305 + **36 new cases from Phase 3.6**: `opsforge-bootstrap` BT1–BT7 (BT7 = CRITICAL 回归：非仓库 cwd + 动态 import 副本 + `runInstall` 制品落盘，补 e2e BT6 仅 `fs.existsSync` 的漏检), `opsforge-runtime` RT1–RT7 (含 `resolveWorkDir` 三级回退 + `runInstall` 委托), `install-registry` RF1–RF4 (`readRegistryForInstall` repo-fresh-prefers-home-fallback). 原 305 cases across: eval (EV1–EV5 rubric axes), test-runner schema/regex/llm_judge/golden modes + `test-runner-selfexec.test.mjs` (N1 NODE_TEST_CONTEXT guard), resolve-profile (RP1–RP8 topo+pin), workflow-compile switch/if/loop/checkpoint (WC8–WC16), workflow-runner state machine (WF1–WF12 + WF10b on_max=halt), intake orchestrator + intake-fetch execFileSync + intake-license LLM-assist, security-scan overprivileged_tool/supply_chain_unpinned/data_residency_cn + DNS-rebinding SSRF (N3), report-renderer security-report (F3), opsforge discover/report/repair, install --profile/--profile-lock/--fresh/--downgrade + dify reachability (F2) + --uninstall --project forwarding (F1) + manual-paste paste-file (F4), adapter tests for cursor/codex/cline/dify.
@@ -329,18 +408,20 @@ Distilled from the Phase 3.6 fix-pass (tdd-guide + e2e-runner + code-reviewer + 
 - **如何避免（已采纳）：** 薄 runtime wrapper（零 bare-dep 顶层 import，仅 `node:` 内建 + `./paths.mjs`）+ `~/.opsforge/.runtime-root.json` 记录仓库根，运行时 `pathToFileURL` 动态 import 仓库根 `install.mjs`，依赖在仓库 `node_modules` 解析。**架构不变量：`~/.opsforge/` 非完全自包含 → 仓库必须在机器上持续存在**才能 in-platform 安装。对 dogfood/开发场景够用；"装到无仓库机器"需打包 `node_modules` 发行版（后续 Phase）。
 
 
-## Next phase (Phase 4 per IMPLEMENTATION-PLAN.md)
+## Next phase (Phase 4 governance flywheel — 其余项 per IMPLEMENTATION-PLAN.md)
 
-**Phase 2 + Phase 3 + Phase 3.6 are SHIPPED.** The remaining work is:
+**Phase 4 第一刀（skill-up 融合）SHIPPED 2026-07-27。** 其余 governance flywheel 项仍 pending：
 
-- **Phase 4 — governance flywheel** (per IMPLEMENTATION-PLAN.md). Scope TBD by steering; expected to cover cross-cap dependency-graph dashboards, contributor reputation scoring, automated capability lifecycle (deprecate/sunset), and the `opsforge-feedback` MCP telemetry loop closure at scale.
+- **Phase 4 其余 — governance flywheel** (per IMPLEMENTATION-PLAN.md)。Scope TBD by steering; expected to cover cross-cap dependency-graph dashboards, contributor reputation scoring, automated capability lifecycle (deprecate/sunset), and the `opsforge-feedback` MCP telemetry loop closure at scale。
+- **草稿采集 agent**（帮运营把对话/产出转成草稿投到 `_drafts/`，走 `new-capability.mjs` 入口）— Phase 4 §15 条目，未交付。
+- **`registry.yaml` / `registry-brands.yaml` 演进为远程 `index.json`** + `pickVersion` semver-range intersection wiring — deferred by steering 2026-07-24，随远程 registry 一起演进。
 - **Steering decisions — all 4 CONFIRMED 2026-07-24 (no open steering items):**
   1. **Tier2-min** — RESOLVED + shipped: `adapters/base.mjs tier()` tightened to §22.3 "至少 2 个文件/配置类" (Tier2 = prompt_exec + ≥2 of the other 5; else Tier3). Test `A1c`. No platform hits the edge today, but the spec is now honest.
   2. **`pickVersion` wiring** — DEFERRED to Phase 4 by steering: `tools/resolve-profile.mjs` keeps single-version registry pin; full semver-range intersection lands with the remote `index.json` registry (Phase 4).
   3. **D5** brand-variant skeletons — CONFIRMED: keep runtime-inject (`injectCustomer()`); no 4 extra entity template dirs.
   4. **D6** third-party intake — CONFIRMED: full intake (Phase 3.4) is the delivered scope.
 
-Phase 1's `validate.mjs` (R16–R22 + runSuite), `release.mjs` (now 3-report gate), `test-runner.mjs` (now 7 modes), `install.mjs` (now + profile/downgrade/repair/project-forwarding + `readRegistryForInstall` home fallback), `BaseAdapter` (now 5 platform children + degradation matrix), `workflow-compile.mjs` (now full control-flow), `opsforge.mjs` (now full v9 command surface + top-level menu + `detectPlatform`), `opsforge-bootstrap.mjs` + `opsforge-runtime.mjs` (Phase 3.6 self-bootstrap), and `packs/opsforge-meta/` (3 self-hosted caps) are the foundation Phase 4 extends.
+Phase 1's `validate.mjs` (now R16–R23 + runSuite), `release.mjs` (3-report gate), `test-runner.mjs` (now 7 modes + pre_gates/turns/check/multi-engine), `install.mjs` (now + profile/downgrade/repair/project-forwarding + `readRegistryForInstall` home fallback), `BaseAdapter` (now 5 platform children + degradation matrix), `workflow-compile.mjs` (full control-flow), `opsforge.mjs` (now full v9 command surface + top-level menu + `detectPlatform` + evolve/evals-import/evals-export/benchmark), `opsforge-bootstrap.mjs` + `opsforge-runtime.mjs` (Phase 3.6 self-bootstrap), `packs/opsforge-meta/` (3 self-hosted caps), and Phase 4's `regression-sink.mjs` + `evals-bridge.mjs` + `benchmark.mjs` + eval `--iteration`/`failures.jsonl` are the foundation Phase 4 governance flywheel extends.
 
 ## Phase 2 + 3 + 3.6 — Open decisions table (steering items)
 
