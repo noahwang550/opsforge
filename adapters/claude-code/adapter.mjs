@@ -36,7 +36,12 @@ export class ClaudeCodeAdapter extends BaseAdapter {
         const sourcePath = path.join(dir, y.entrypoint || 'source.md');
         let content = '';
         if (fs.existsSync(sourcePath)) {
-          content = fs.readFileSync(sourcePath, 'utf8');
+          const raw = fs.readFileSync(sourcePath, 'utf8');
+          // source.md carries the OpsForge capability-schema frontmatter (id/pack/...).
+          // Claude Code subagent files are only discovered as @-invokable agents when their
+          // frontmatter has at least `name` and `description` in the native schema. Strip the
+          // source frontmatter, re-emit the minimal Claude Code frontmatter, keep the body.
+          content = toClaudeCodeAgentFile(raw, name, y);
         }
         return [{ kind: 'agent-file', targetPath, content, mcpConfig: null, degradation: null, pasteInstructions: null }];
       }
@@ -180,3 +185,48 @@ export class ClaudeCodeAdapter extends BaseAdapter {
 }
 
 export const adapter = new ClaudeCodeAdapter();
+
+/**
+ * Convert an OpsForge agent source.md into a Claude Code subagent file.
+ * source.md begins with the OpsForge capability-schema frontmatter (id/pack/...);
+ * Claude Code only discovers an agent (@-invokable) when the file frontmatter has
+ * `name` + `description` in its native schema. Strip the source frontmatter, re-emit
+ * the minimal native frontmatter, and keep the body verbatim.
+ * @param {string} raw  source.md content
+ * @param {string} name  agent name (last segment of cap id)
+ * @param {Object} y  parsed capability.yaml
+ * @returns {string} Claude Code subagent file content
+ */
+export function toClaudeCodeAgentFile(raw, name, y) {
+  let body = raw;
+  // Strip a leading `---\n...\n---\n` frontmatter block if present.
+  if (raw.startsWith('---')) {
+    const closeIdx = raw.indexOf('\n---', 3);
+    if (closeIdx !== -1) {
+      const afterFm = raw.slice(closeIdx + 4); // skip past closing `\n---`
+      body = afterFm.replace(/^\r?\n/, '');
+    }
+  }
+  const description = (y && y.description) || (y && y.display_name) || name;
+  const fm =
+    `---\n` +
+    `name: ${name}\n` +
+    `description: ${yamlScalar(description)}\n` +
+    `---\n\n`;
+  return `${fm}${body}`;
+}
+
+/**
+ * Render a string as a safe YAML plain scalar for the agent frontmatter.
+ * Descriptions are single-line in practice; quote only when needed.
+ * @param {string} v
+ * @returns {string}
+ */
+function yamlScalar(v) {
+  const s = String(v ?? '');
+  // Quote when empty or when it contains a character that would break a plain scalar.
+  if (s === '' || /[:#&*!|>'"%@`{},\[\]]/.test(s) || /^\s|\s$/.test(s)) {
+    return JSON.stringify(s); // JSON string is valid YAML double-quoted scalar
+  }
+  return s;
+}

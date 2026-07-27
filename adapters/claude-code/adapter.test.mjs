@@ -205,6 +205,11 @@ test('A7 translate() produces agent-file artifact at ~/.claude/agents/', async (
   assert.equal(artifacts[0].kind, 'agent-file');
   assert.ok(artifacts[0].targetPath.includes(path.join('.claude', 'agents', 'bar.md')), artifacts[0].targetPath);
   assert.ok(artifacts[0].content.includes('body'));
+  // A7b: agent artifact must carry Claude Code-native frontmatter (name + description)
+  // so Claude Code discovers it as an @-invokable subagent. The OpsForge source.md
+  // frontmatter (id/pack/...) must be stripped, not passed through verbatim.
+  assert.match(artifacts[0].content, /^---\nname: bar\ndescription: d\n---\n\nbody/, artifacts[0].content);
+  assert.equal(artifacts[0].content.includes('id: foo.bar'), false, 'OpsForge frontmatter must be stripped');
 });
 
 // ---------- A8 translate() produces skill artifact path ----------
