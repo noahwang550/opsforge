@@ -1082,6 +1082,8 @@ CI 在 PR 阶段对 staged → released 的迁移强制校验以下全部项，�
 
 ### Phase 4（治理与飞轮，持续）
 
+> **2026-07-27 交付状态注记：** Phase 4 第一刀（skill-up 融合，8 slice）已交付——把 `alibaba/skill-up` 可吸收概念内化进 v8 harness（pre_gates/turns/post_condition/check/回归闭环/evals 桥接/benchmark/多 engine/iteration 归档），不引 Go 二进制、零新依赖，424/0 tests + 6 gates 全绿。详见 `docs/design-archive/phase4-skillup-fusion-plan.md` + `phase4-architecture.md` + `skillup-intel.md`。本节其余 governance flywheel 条目（草稿采集 agent / 远程 `index.json` / `pickVersion` wiring）仍 pending，不动主文逻辑。
+
 - 草稿采集 agent（帮运营把对话/产出转成草稿投到 `_drafts/`，走 `new-capability.mjs` 入口）
 - `registry.yaml` / `registry-brands.yaml` 演进为远程 `index.json`
 - 平台联动：通用能力随公司 Agent 平台出货
@@ -1414,7 +1416,7 @@ judge 仅 `llm_judge`/`golden` 模式用例调 judge LLM，`exact`/`schema`/`con
 | **Phase 1 (MVP)** | `test-runner.mjs` 真实现（仅 `exact`/`contains`/`human` 模式，dry-run 用 `claude -p`，单平台 claude-code）；`schema/test-case.schema.json`；模板 `tests/*.yaml` 升级到 7 字段；R16–R22 七条入 `validate.mjs`；staged 门禁跑 functional runSuite；validation-report.regression_cases 升级为行为结果。**不**含 llm_judge、不含 eval.mjs。 |
 | **Phase 2** | `tools/eval.mjs`（五维 rubric + eval-report.json + 阈值裁决）；`llm_judge`/`golden`/`schema`/`regex` 模式；judge 提示词契约 + eval.config.yaml；released 门禁要求 eval-report pass；多平台 matrix eval；release.mjs 三报告齐备校验。 |
 | **Phase 3** | `opsforge-feedback` MCP + `--doctor` effectiveness 体检 + manifest effectiveness_flag；weekly re-eval cron + eval-history 归档；R22 自作弊检测强化（语义级）；workflow dry-run eval 接 v7 loop/checkpoint 能力。 |
-| **Phase 4** | 反馈闭环飞轮：degraded 能力自动开 re-eval issue；judge 模型版本治理；高优能力 effectiveness SLA 监控；eval-history 趋势看板（随 v7 remote index.json 一起演进）。 |
+| **Phase 4** | 反馈闭环飞轮：degraded 能力自动开 re-eval issue；judge 模型版本治理；高优能力 effectiveness SLA 监控；eval-history 趋势看板（随 v7 remote index.json 一起演进）。**2026-07-27 注记：** skill-up 融合 8 slice 已交付（pre_gates/turns/check/回归闭环/evals 桥接/benchmark/多 engine/iteration 归档，详见 `docs/design-archive/phase4-*.md`）；本行其余 governance flywheel 项仍 pending。 |
 
 ### 21.14 相关文件路径（均以 `D:\XD\ClaudeCode\sy-eeo\` 为根，未创建属 v8 新增/扩展）
 
@@ -1560,7 +1562,7 @@ v8 §21.5 dry-run harness 默认 `claude -p`。国内自研平台无 CLI 时：T
 | **Phase 2** | 通用降级矩阵实现（translate 按能力点选降级策略）；国内自研平台 adapter 示例（1 个 Tier 2 + 1 个 Tier 3）；platform.schema.json；opsforge report 渲染三份 JSON 报告；install --repair/--repair-mcp（载体 D paste 文件）；report-templates 完整模板集；OPSFORGE_RUNNER=<platform> 经 adapter HTTP API 跑 prompt；`release.mjs` 写 released/registry state；`doctor --project` 转发。**工程后端 COMPLETE；UX shell（顶层菜单/wizard 端到端/discover 质量灯/feedback/无 cwd/载体 B/平台内安装入口）原 DEFERRED to Phase 3.6，现已由 Phase 3.6 全部交付。** |
 | **Phase 3** | http-direct mcp 降级形态；data-residency-cn 安全扫描；eval.config.yaml 国内模型 provider；install --downgrade 回滚；opsforge feedback 交互式；降级产物行为偏离 CI 校验（降级安装后跑 eval 对比原装）；--doctor 平台 Tier 报告 + 能力点真实性抽检（D3）。 |
 | **Phase 3.6** | **SHIPPED 2026-07-24（v9 UX shell closure，Phase 2.5 deferred 集中于此，先于 Phase 4）：** 顶层菜单（`opsforge menu` 替换裸分发）；`opsforge wizard` 端到端 5 步；`opsforge discover` 读 per-project manifest + 质量灯 + 商用标签；`opsforge feedback` UX 入口（写 jsonl）；无 cwd bootstrap（`opsforge-runtime.mjs` `resolveWorkDir()` 三级回退 + `~/.opsforge/.runtime-root.json`）；载体 B（`packs/opsforge-meta/` meta-pack：`agents/opsforge` + `agents/opsforge-installer` + `skills/opsforge-wizard`）；菜单引导；平台内安装入口（`opsforge-bootstrap.mjs` + `detectPlatform()`）；实时质量反馈 wizard 串接。平台可行性：claude-code/cursor/cline ✅、codex ⚠、dify ❌退 D。bare `node --test` 341/0；6 gates 全绿（7 caps）。**架构不变量：** runtime 副本动态 import 仓库根 `install.mjs` → 仓库须持续存在；无仓库机器发行版留后续 Phase。 |
-| **Phase 4** | 国内自研平台生态：3+ 国内平台接入；降级策略 A/B 测试（http-direct vs manual-paste）；报告渲染趋势看板（随 v7/v8 eval-history 演进）；多语言报告（--lang en）；平台能力点自动探测（detect() 探测实际能力点，而非只读声明）。 |
+| **Phase 4** | 国内自研平台生态：3+ 国内平台接入；降级策略 A/B 测试（http-direct vs manual-paste）；报告渲染趋势看板（随 v7/v8 eval-history 演进）；多语言报告（--lang en）；平台能力点自动探测（detect() 探测实际能力点，而非只读声明）。**2026-07-27 注记：** skill-up 融合 8 slice 已交付（pre_gates/turns/check/回归闭环/evals 桥接/benchmark/多 engine/iteration 归档，详见 `docs/design-archive/phase4-*.md`）；本行其余国内平台生态项仍 pending。 |
 
 ### 22.13 相关文件路径（均以 `D:\XD\ClaudeCode\sy-eeo\` 为根，未创建属 v9 新增/扩展）
 

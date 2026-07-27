@@ -60,9 +60,13 @@ export async function main(argv = process.argv.slice(2)) {
       case 'report': return await cmdReport(argv.slice(1));
       case 'feedback': return await cmdFeedbackInteractive(argv.slice(1));
       case 'wizard': return await cmdWizardInteractive(argv.slice(1));
+      case 'evolve': return await cmdEvolveInteractive(argv.slice(1));
+      case 'evals-import': return await cmdEvalsImport(argv.slice(1));
+      case 'evals-export': return await cmdEvalsExport(argv.slice(1));
+      case 'benchmark': return await cmdBenchmark(argv.slice(1));
       default:
         console.error(`opsforge: unknown command "${cmd}"`);
-        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard');
+        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard, evolve, evals-import, evals-export, benchmark');
         return 2;
     }
   } catch (e) {
@@ -519,6 +523,173 @@ function parseSimpleOpts(argv) {
     } else o._.push(a);
   }
   return o;
+}
+
+/**
+ * opsforge evolve <capDir|capId> — 列待沉淀条目，多选后写 _drafts/ 草稿。
+ * 不自动 promote（人工 gate 强制点）。
+ */
+async function cmdEvolveInteractive(args) {
+  if (!requireTty('evolve')) return 2;
+  const opts = parseSimpleOpts(args);
+  const target = opts._[0];
+  if (!target) {
+    console.error('opsforge evolve: 需提供 capDir 或 capId');
+    return 2;
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await cmdEvolve(rl, { target, opsforgeHome: opts.opsforgeHome });
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * @param {readline.Interface} rl
+ * @param {{target: string, opsforgeHome?: string, workDir?: string}} opts
+ * @returns {Promise<number>}
+ */
+export async function cmdEvolve(rl, opts = {}) {
+  const ask = (q) => new Promise((r) => rl.question(q, r));
+  const { parseCapability } = await import('./validate.mjs');
+  const { collectSources, generateCase } = await import('./regression-sink.mjs');
+  const { resolveWorkDir } = await import('./opsforge-runtime.mjs');
+  const { assertCapId } = await import('./paths.mjs');
+  let capId, capDir;
+  try {
+    assertCapId(opts.target);
+    capId = opts.target;
+  } catch {
+    // treat as capDir
+    const cap = parseCapability(path.resolve(opts.target));
+    if (!cap.yaml) {
+      console.error(`evolve: 无法解析能力目录 ${opts.target}`);
+      return 1;
+    }
+    capId = cap.yaml.id;
+    capDir = cap.dir;
+  }
+  const { feedbacks, failures } = await collectSources(capId, { opsforgeHome: opts.opsforgeHome });
+  if (feedbacks.length === 0 && failures.length === 0) {
+    console.log('○ 没有可沉淀的反馈/失败条目（feedback rating<=3 或 eval failures）。');
+    return 0;
+  }
+  console.log(`找到 ${feedbacks.length} 条低分反馈 + ${failures.length} 条 eval 失败。`);
+  const items = [];
+  for (const f of feedbacks) items.push({ kind: 'feedback', label: `[反馈 ${f.rating}★] ${String(f.text || '').slice(0, 60)}`, src: f });
+  for (const f of failures) items.push({ kind: 'failure', label: `[失败 ${f.case || ''} ${f.mode || ''}] ${String(f.reason || '').slice(0, 60)}`, src: null, failure: f });
+  items.forEach((it, i) => console.log(`  ${i + 1}) ${it.label}`));
+  const sel = (await ask('选择要沉淀的序号（逗号分隔，回车=全部）: ')).trim();
+  const idxs = sel === '' ? items.map((_, i) => i) : sel.split(',').map((s) => Number(s.trim()) - 1).filter((n) => n >= 0 && n < items.length);
+  if (idxs.length === 0) {
+    console.log('未选择，已退出。');
+    return 0;
+  }
+  const pack = capId.split('.')[0];
+  const name = capId.split('.')[1];
+  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+  const draftsDir = path.join(workDir, 'packs', '_drafts', pack, name);
+  let written = 0;
+  for (const i of idxs) {
+    const it = items[i];
+    try {
+      const fb = it.kind === 'feedback' ? it.src : null;
+      const fail = it.kind === 'failure' ? it.failure : null;
+      const { destPath, name: caseName } = generateCase(fb, fail, { draftsDir });
+      console.log(`  绿 已生成 ${destPath} (name=${caseName})`);
+      written++;
+    } catch (e) {
+      console.log(`  [红] 跳过 #${i + 1}: ${e.message}`);
+    }
+  }
+  console.log(`\n已生成 ${written} 条草稿到 ${draftsDir}/tests/。`);
+  console.log('下一步: 填写 expected + judge_rubric（标记 __FILL_ME__ 的位置），然后:');
+  console.log(`  node tools/new-capability.mjs --promote ${draftsDir}`);
+  console.log('草稿含 __FILL_ME__，draft gate (R7) 会挡住未填实的草稿——这是人工 gate。');
+  return 0;
+}
+
+/**
+ * opsforge evals-import <evals.json> <pack>.<name> [--workDir <dir>]
+ * Imports an evals.json file into _drafts/<pack>/<name>/tests/case-NN.yaml drafts.
+ * If draftsDir doesn't exist, scaffolds via new-capability.mjs first.
+ * Drafts contain __FILL_ME__ — promote is the human gate (R7 blocks them).
+ */
+async function cmdEvalsImport(args) {
+  const opts = parseSimpleOpts(args);
+  const evalsPath = opts._[0];
+  const capId = opts._[1];
+  if (!evalsPath || !capId) {
+    console.error('opsforge evals-import: 用法: evals-import <evals.json> <pack>.<name> [--workDir <dir>]');
+    return 2;
+  }
+  assertCapId(capId);
+  const { resolveWorkDir } = await import('./opsforge-runtime.mjs');
+  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+  const draftsDir = path.join(workDir, 'packs', '_drafts', capId.split('.')[0], capId.split('.')[1]);
+  let evalsJson;
+  try {
+    evalsJson = JSON.parse(fs.readFileSync(path.resolve(evalsPath), 'utf8'));
+  } catch (e) {
+    console.error(`opsforge evals-import: 无法解析 ${evalsPath}: ${e.message}`);
+    return 1;
+  }
+  // Scaffold drafts dir if missing (so import has a home).
+  if (!fs.existsSync(draftsDir)) {
+    fs.mkdirSync(draftsDir, { recursive: true });
+  }
+  const { importFromEvalsJson } = await import('./evals-bridge.mjs');
+  const { written, skipped } = importFromEvalsJson(evalsJson, { draftsDir });
+  console.log(`绿 已导入 ${written.length} 条草稿到 ${draftsDir}/tests/（跳过 ${skipped} 条）。`);
+  console.log('草稿含 __FILL_ME__，draft gate (R7) 会挡住未填实的草稿——这是人工 gate。');
+  console.log(`  下一步: 填写 expected + judge_rubric，然后 node tools/new-capability.mjs --promote ${draftsDir}`);
+  return 0;
+}
+
+/**
+ * opsforge evals-export <capDir> — read tests/*.yaml → evals.json to stdout.
+ */
+async function cmdEvalsExport(args) {
+  const opts = parseSimpleOpts(args);
+  const capDir = opts._[0];
+  if (!capDir) {
+    console.error('opsforge evals-export: 用法: evals-export <capDir>');
+    return 2;
+  }
+  const { exportToEvalsJson } = await import('./evals-bridge.mjs');
+  const result = exportToEvalsJson(path.resolve(capDir));
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  return 0;
+}
+
+/**
+ * opsforge benchmark <capDir> — with/without-skill delta (advisory, not in release gate).
+ */
+async function cmdBenchmark(args) {
+  const opts = parseSimpleOpts(args);
+  const capDir = opts._[0];
+  if (!capDir) {
+    console.error('opsforge benchmark: 用法: benchmark <capDir>');
+    return 2;
+  }
+  const { runBenchmark } = await import('./benchmark.mjs');
+  try {
+    const report = await runBenchmark(path.resolve(capDir), {
+      opsforgeHome: opts.opsforgeHome,
+      runner: opts.runner,
+      platform: opts.platform,
+    });
+    console.log(`benchmark: ${report.cap_id}`);
+    console.log(`  with_skill    overall=${report.with_skill.overall} (n=${report.with_skill.n}, passed=${report.with_skill.passed})`);
+    console.log(`  without_skill overall=${report.without_skill.overall} (n=${report.without_skill.n}, passed=${report.without_skill.passed})`);
+    console.log(`  delta=${report.delta}  min_delta=${report.min_delta}  verdict=${report.verdict}`);
+    console.log(`  报告: ${path.join(path.resolve(capDir), 'benchmark-report.json')} (advisory，不进 release gate)`);
+    return 0;
+  } catch (e) {
+    console.error(`opsforge benchmark: ${e.message}`);
+    return 1;
+  }
 }
 
 const invokedDirect = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('opsforge.mjs');

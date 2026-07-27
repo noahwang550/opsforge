@@ -19,6 +19,38 @@ export function resolveOpsforgeHome() {
   return path.join(resolveHome(), '.opsforge');
 }
 
+/**
+ * Resolve ~/.opsforge/eval-history/<cap-id>/ (created on first write).
+ * Phase 4 P0-B: regression-sink consumption point.
+ * @param {string} capId  "<pack>.<name>" — asserted via assertCapId
+ * @returns {string} absolute dir
+ */
+export function resolveEvalHistoryDir(capId) {
+  assertCapId(capId);
+  return path.join(resolveOpsforgeHome(), 'eval-history', capId);
+}
+
+/**
+ * Resolve ~/.opsforge/eval-history/<cap-id>/iteration-<N>/.
+ * n=0 means "latest" (no subdir).
+ * @param {string} capId
+ * @param {number} n  iteration number (>=0; 0 = latest, no subdir)
+ * @returns {string}
+ */
+export function resolveEvalHistoryIterationDir(capId, n) {
+  assertCapId(capId);
+  if (!Number.isInteger(n) || n < 0) throw new Error(`iteration must be >=0, got ${n}`);
+  const base = resolveEvalHistoryDir(capId);
+  return n === 0 ? base : path.join(base, `iteration-${n}`);
+}
+
+/**
+ * Resolve ~/.opsforge/eval-history/<cap-id>/failures.jsonl (latest).
+ */
+export function resolveFailuresJsonl(capId) {
+  return path.join(resolveEvalHistoryDir(capId), 'failures.jsonl');
+}
+
 /** Atomic write: write to <dest>.tmp.<pid> then rename. fsync before rename.
  *  Idempotent short-circuit: if existing content hash === new content, skip.
  *  @param {string} absDest  absolute target path

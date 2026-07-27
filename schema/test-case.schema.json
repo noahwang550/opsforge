@@ -14,7 +14,7 @@
     "input": {},
     "expect": {
       "type": "string",
-      "enum": ["exact", "schema", "contains", "regex", "llm_judge", "golden", "human"]
+      "enum": ["exact", "schema", "contains", "regex", "llm_judge", "golden", "human", "check"]
     },
     "expected": {},
     "schema_ref": {
@@ -42,6 +42,41 @@
       "type": "integer",
       "default": 30000,
       "minimum": 0
+    },
+    "pre_gates": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mode", "expected"],
+        "properties": {
+          "mode": { "type": "string", "enum": ["contains", "regex", "exact", "files_exist"] },
+          "expected": { "description": "contains/regex/exact → string|string[]; files_exist → string|string[] (relative paths from capDir)" }
+        }
+      }
+    },
+    "turns": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "content"],
+        "properties": {
+          "role": { "type": "string", "enum": ["user", "assistant"] },
+          "content": { "type": "string", "minLength": 1 },
+          "post_condition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["must_contain_any", "on_fail"],
+            "properties": {
+              "must_contain_any": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "on_fail": { "type": "string", "enum": ["skip", "fail"] }
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -28,3 +28,9 @@ threshold: 0.7
 # When the runner is static-only (no model), the verdict is 'pending' and these
 # axes are marked runner_limited — they cannot be fully evaluated without execution.
 runner_limited_verdict: pending
+
+# Phase 4 P1-D: with/without-skill delta benchmark (advisory — not in release gate).
+benchmark:
+  enabled: false
+  baseline_prompt: "You are a helpful assistant. Answer the user's request."
+  min_delta: 0.1

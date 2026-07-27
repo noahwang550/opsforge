@@ -64,16 +64,18 @@ export function computeAxes(verdicts, opts = {}) {
  * Evaluate a capability: run the suite, read security-report, compute 5 axes,
  * optionally write eval-report.json to the cap dir.
  * @param {string} capDir
- * @param {{runner?: string, opsforgeHome?: string, write?: boolean, platform?: string}} opts
+ * @param {{runner?: string, opsforgeHome?: string, write?: boolean, platform?: string, runSuite?: Function, iteration?: number}} opts
  * @returns {Promise<Object>} eval-report shape
  */
 export async function evaluateCap(capDir, opts = {}) {
   const config = loadConfig();
-  // Lazy import to avoid circular init (test-runner imports validate; validate is independent).
-  const { runSuite } = await import('./test-runner.mjs');
+  // Phase 4 fix (#2): runSuite is injectable so tests drive the real
+  // archive/iteration logic via a fake runSuite instead of re-implementing it.
+  const runSuite = opts.runSuite || (await import('./test-runner.mjs')).runSuite;
   const { parseCapability } = await import('./validate.mjs');
   const cap = parseCapability(capDir);
   const id = (cap.yaml && cap.yaml.id) || path.basename(capDir);
+  const iteration = opts.iteration || 0;
 
   const { summary, cases } = await runSuite(capDir, {
     runner: opts.runner,
@@ -121,27 +123,112 @@ export async function evaluateCap(capDir, opts = {}) {
     verdict,
   };
 
+  // Phase 4 P0-B: archive failures for regression-sink consumption.
+  // Non-fatal: eval must not fail because archiving failed.
+  if (verdict === 'fail') {
+    try {
+      const { resolveFailuresJsonl } = await import('./paths.mjs');
+      const failPath = resolveFailuresJsonl(id);
+      fs.mkdirSync(path.dirname(failPath), { recursive: true });
+      const failedCases = cases.filter((c) => c.pass === false);
+      if (failedCases.length > 0) {
+        const lines = failedCases
+          .map((c) => JSON.stringify({
+            cap_id: id,
+            case: c.case,
+            mode: c.mode,
+            reason: String(c.reason || '').slice(0, 500),
+            actual: String(c.actual ?? '').slice(0, 500),
+            ts: new Date().toISOString(),
+          }))
+          .join('\n') + '\n';
+        fs.appendFileSync(failPath, lines);
+      }
+    } catch (e) {
+      // Non-fatal: eval must not fail because archiving failed.
+      report.archive_error = e.message;
+    }
+  }
+
+  // Phase 4 P2-B: archive to iteration-N/ when --iteration N is set (N>=1).
+  if (iteration && iteration >= 1) {
+    try {
+      const { resolveEvalHistoryIterationDir } = await import('./paths.mjs');
+      const iterDir = resolveEvalHistoryIterationDir(id, iteration);
+      fs.mkdirSync(iterDir, { recursive: true });
+      // Copy the eval-report we're about to write into the iteration subdir.
+      const reportJson = JSON.stringify(report, null, 2);
+      fs.writeFileSync(path.join(iterDir, 'eval-report.json'), reportJson);
+      // latest.json always overwritten (last-write-wins).
+      fs.writeFileSync(path.join(resolveEvalHistoryIterationDir(id, 0), 'latest.json'), reportJson);
+    } catch (e) {
+      report.archive_error = report.archive_error
+        ? `${report.archive_error}; iteration: ${e.message}`
+        : `iteration: ${e.message}`;
+    }
+  }
+
   if (opts.write) {
     atomicWriteSync(path.join(capDir, 'eval-report.json'), JSON.stringify(report, null, 2));
   }
   return report;
 }
 
+/**
+ * Phase 4 P2-B: parse `--iteration N` flag from argv.
+ * Returns N (>=0; 0 = default, no archiving). Accepts `--iteration=3` and
+ * `--iteration 3` forms. Returns 0 if flag absent.
+ */
+export function parseIterationFlag(argv) {
+  const i = argv.findIndex((a) => a.startsWith('--iteration'));
+  if (i < 0) return 0;
+  const a = argv[i];
+  if (a.includes('=')) {
+    const n = Number(a.split('=')[1]);
+    return Number.isInteger(n) && n >= 0 ? n : 0;
+  }
+  const next = argv[i + 1];
+  const n = next !== undefined ? Number(next) : NaN;
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Phase 4 fix (#4): strip --iteration (and its value when space-separated) from
+ * argv so the main dispatch can route on the remaining args. Returns a new array.
+ */
+export function stripIterationFlag(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--iteration')) {
+      if (!a.includes('=') && i + 1 < argv.length && /^\d+$/.test(argv[i + 1])) {
+        i++; // skip the value of `--iteration N`
+      }
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
 /** CLI: `node tools/eval.mjs <capDir> | --all` */
 export function main() {
   const argv = process.argv.slice(2);
-  if (argv.length === 0) {
-    console.error('usage: node tools/eval.mjs <capDir> | --all');
+  const iteration = parseIterationFlag(argv);
+  // Phase 4 fix (#4): strip --iteration so dispatch routes on the real arg.
+  const rest = stripIterationFlag(argv);
+  if (rest.length === 0) {
+    console.error('usage: node tools/eval.mjs <capDir> | --all [--iteration N]');
     process.exit(2);
   }
-  if (argv[0] === '--all') {
+  if (rest[0] === '--all') {
     (async () => {
       const { scanCapabilities } = await import('./validate.mjs');
       const caps = scanCapabilities(process.cwd());
       let allPass = true;
       for (const cap of caps) {
         if (!cap.yaml) continue;
-        const report = await evaluateCap(cap.dir, { write: true });
+        const report = await evaluateCap(cap.dir, { write: true, iteration });
         const tag = report.verdict === 'pass' ? 'PASS' : (report.verdict === 'pending' ? 'PEND' : 'FAIL');
         if (tag === 'FAIL') allPass = false;
         console.log(`${tag}  ${cap.yaml.id}  (overall=${report.overall}, verdict=${report.verdict})`);
@@ -149,10 +236,10 @@ export function main() {
       process.exit(allPass ? 0 : 1);
     })();
   } else {
-    const capDir = path.resolve(argv[0]);
+    const capDir = path.resolve(rest[0]);
     (async () => {
       try {
-        const report = await evaluateCap(capDir, { write: true });
+        const report = await evaluateCap(capDir, { write: true, iteration });
         for (const c of report.cases) {
           const tag = c.pass === true ? 'PASS' : c.pass === 'pending' ? 'PEND' : 'FAIL';
           console.log(`${tag}  ${c.case}  (${c.mode})  ${c.reason || ''}`);

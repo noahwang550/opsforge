@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const SUPPORTED_MODES = new Set(['exact', 'contains', 'human', 'schema', 'regex', 'llm_judge', 'golden']);
+export const SUPPORTED_MODES = new Set(['exact', 'contains', 'human', 'schema', 'regex', 'llm_judge', 'golden', 'check']);
 // Phase 2.2: all modes now implemented; STUB_MODES removed.
 
 /**
@@ -126,6 +126,69 @@ export function compareGolden(actual, expected, threshold = 0.7) {
 }
 
 /**
+ * Structured assertions (Phase 4 P1-B expect=check): tool_called / files_exist /
+ * files_not_exist / must_contain / must_not_contain. Text-contains matching for
+ * tool_call blocks (precise block parsing deferred). Read-only fs for files_*.
+ * @param {string} actual  transcript text (may include stream-json lines)
+ * @param {Object} expected  shape: { tool_called?: {name, args?}, files_exist?: string[], files_not_exist?: string[], must_contain?: string[], must_not_contain?: string[] }
+ * @param {Object} opts  {capDir?: string}
+ * @returns {{pass: boolean, reason: string, actual: string}}
+ */
+export function compareCheck(actual, expected, opts = {}) {
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) {
+    return { pass: false, reason: 'check: expected must be object', actual };
+  }
+  const act = String(actual);
+  const ws = opts.capDir || '.';
+  if (expected.tool_called) {
+    const tc = expected.tool_called;
+    if (!tc.name || typeof tc.name !== 'string') {
+      return { pass: false, reason: 'check: tool_called.name required', actual };
+    }
+    // Text-contains match: look for "name":"<tc.name>" in transcript (stream-json tool_use blocks).
+    const needle = `"name":"${tc.name}"`;
+    if (!act.includes(needle)) {
+      return { pass: false, reason: `check: tool_called "${tc.name}" not found in transcript`, actual };
+    }
+    if (tc.args && typeof tc.args === 'object') {
+      const argsJson = JSON.stringify(tc.args).slice(0, 200);
+      if (!act.includes(argsJson)) {
+        return { pass: false, reason: `check: tool_called "${tc.name}" args mismatch (text-contains)`, actual };
+      }
+    }
+  }
+  if (Array.isArray(expected.files_exist)) {
+    for (const p of expected.files_exist) {
+      if (!fs.existsSync(path.join(ws, p))) {
+        return { pass: false, reason: `check: files_exist missing ${p}`, actual };
+      }
+    }
+  }
+  if (Array.isArray(expected.files_not_exist)) {
+    for (const p of expected.files_not_exist) {
+      if (fs.existsSync(path.join(ws, p))) {
+        return { pass: false, reason: `check: files_not_exist present ${p}`, actual };
+      }
+    }
+  }
+  if (Array.isArray(expected.must_contain)) {
+    for (const s of expected.must_contain) {
+      if (!act.includes(String(s))) {
+        return { pass: false, reason: `check: must_contain missing ${String(s).slice(0, 60)}`, actual };
+      }
+    }
+  }
+  if (Array.isArray(expected.must_not_contain)) {
+    for (const s of expected.must_not_contain) {
+      if (act.includes(String(s))) {
+        return { pass: false, reason: `check: must_not_contain present ${String(s).slice(0, 60)}`, actual };
+      }
+    }
+  }
+  return { pass: true, reason: '', actual };
+}
+
+/**
  * llm_judge mode: call a judge endpoint (OpenAI-compatible chat completions) via
  * built-in fetch (no new dep; D4 domestic-model compatible). opts.fetch is injectable for tests.
  * Returns { pass, score, reason }.
@@ -218,8 +281,47 @@ async function compareForMode(mode, actual, caseYaml, opts) {
     case 'regex': return { ...compareRegex(actual, caseYaml.expected), actual };
     case 'golden': return { ...compareGolden(actual, caseYaml.expected, typeof caseYaml.judge_threshold === 'number' ? caseYaml.judge_threshold : 0.7), actual };
     case 'llm_judge': return { ...(await compareLlmJudge(actual, caseYaml, opts)), actual };
+    case 'check': return { ...compareCheck(actual, caseYaml.expected, { capDir: opts.capDir }), actual };
     default: return { pass: false, reason: `unknown expect mode: ${mode}`, actual };
   }
+}
+
+/**
+ * Check file existence relative to a workspace root.
+ * @param {string[]} relPaths  relative paths from workspaceRoot
+ * @param {string} workspaceRoot  absolute cap dir
+ * @returns {{pass: boolean, reason: string, missing?: string[]}}
+ * Pure: only fs.existsSync side-effect (read-only, no write). Windows-safe via path.join.
+ */
+export function checkFilesExist(relPaths, workspaceRoot) {
+  const paths = Array.isArray(relPaths) ? relPaths : [String(relPaths)];
+  const missing = paths.filter((p) => !fs.existsSync(path.join(workspaceRoot, p)));
+  return missing.length === 0
+    ? { pass: true, reason: '' }
+    : { pass: false, reason: `files_exist: missing ${missing.join(', ')}`, missing };
+}
+
+/**
+ * Run pre_gates (zero-cost front gates). Returns a reason string on first failing
+ * gate (short-circuits), or null when all gates pass (or when no gates apply).
+ * Skipped in static-only (no actual injected).
+ * @param {Object} caseYaml
+ * @param {string} actual
+ * @param {Object} opts  {capDir?}
+ * @returns {Promise<string|null>}  reason if failed, null if ok/skipped
+ */
+async function runPreGates(caseYaml, actual, opts = {}) {
+  if (!Array.isArray(caseYaml.pre_gates) || caseYaml.pre_gates.length === 0) return null;
+  if (actual === undefined || actual === null || actual === '<pending-execution>') return null;
+  for (const g of caseYaml.pre_gates) {
+    const gr = g.mode === 'files_exist'
+      ? checkFilesExist(g.expected, opts.capDir || '.')
+      : await compareForMode(g.mode, actual, { expected: g.expected }, { ...opts });
+    if (!gr.pass) {
+      return `pre_gate(${g.mode}) failed: ${gr.reason || ''}`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -256,6 +358,13 @@ export async function runCase(capDir, caseYaml, opts = {}) {
 
   // If an actual output is injected (testing/eval harness), evaluate directly.
   if (opts.actual !== undefined) {
+    // Phase 4 P0-A: pre_gates run BEFORE the main expect compare. If any gate
+    // fails, we short-circuit and do NOT call the main comparator (saves an
+    // llm_judge fetch on a clearly-failing run). Static-only (no actual) skips.
+    const gateResult = await runPreGates(caseYaml, String(opts.actual), opts);
+    if (gateResult) {
+      return { case: caseYaml.name || '<unnamed>', mode, pass: false, runner, reason: gateResult, actual: String(opts.actual) };
+    }
     const r = await compareForMode(mode, String(opts.actual), caseYaml, { ...opts, capDir });
     return { case: caseYaml.name || '<unnamed>', mode, pass: r.pass, runner, reason: r.reason || '', actual: r.actual, ...(typeof r.score === 'number' ? { score: r.score } : {}) };
   }
@@ -284,10 +393,10 @@ export async function runCase(capDir, caseYaml, opts = {}) {
     };
   }
 
-  // claude runner: execute dry-run then compare
+  // claude runner: execute dry-run then compare (Phase 4 P2-A: dispatch by platform).
   let actual = '';
   try {
-    actual = await executeDryRun(capDir, caseYaml, opts);
+    actual = await executeCliDryRun(platform, capDir, caseYaml, opts);
   } catch (e) {
     return {
       case: caseYaml.name || '<unnamed>',
@@ -297,6 +406,11 @@ export async function runCase(capDir, caseYaml, opts = {}) {
       reason: `execution error: ${e.message}`,
       actual: '',
     };
+  }
+  // Phase 4 P0-A: pre_gates run on the executed actual before main compare.
+  const gateResult = await runPreGates(caseYaml, actual, { ...opts, capDir });
+  if (gateResult) {
+    return { case: caseYaml.name || '<unnamed>', mode, pass: false, runner, reason: gateResult, actual };
   }
   const r = await compareForMode(mode, actual, caseYaml, { ...opts, capDir });
   return { case: caseYaml.name || '<unnamed>', mode, pass: r.pass, runner, reason: r.reason || '', actual: r.actual, ...(typeof r.score === 'number' ? { score: r.score } : {}) };
@@ -339,11 +453,67 @@ async function executeHttpDryRun(capDir, caseYaml, opts) {
 }
 
 /**
- * Execute a dry-run of the capability for a test case.
- * P1: spawn `claude -p` with the capability body as system prompt.
- * Falls back to static-only if claude not available.
+ * Phase 4 P2-A: dispatch to a platform-specific CLI runner.
+ * claude-code → executeClaudeDryRun (multi-turn aware); cursor/codex/cline →
+ * spawnSimple platform CLI; dify → executeHttpDryRun (HTTP API).
+ * Falls back to static-only error if the platform CLI is unavailable.
+ * @param {string} platform  claude-code|cursor|codex|cline|dify
+ * @param {string} capDir
+ * @param {Object} caseYaml
+ * @param {Object} opts
+ * @returns {Promise<string>} actual output
  */
-async function executeDryRun(capDir, caseYaml, opts) {
+export async function executeCliDryRun(platform, capDir, caseYaml, opts = {}) {
+  switch (platform) {
+    case 'claude-code': return await executeClaudeDryRun(capDir, caseYaml, opts);
+    case 'cursor': return await spawnSimple('cursor', ['--print', JSON.stringify(caseYaml.input)], caseYaml, opts);
+    case 'codex': return await spawnSimple('codex', ['exec', JSON.stringify(caseYaml.input)], caseYaml, opts);
+    case 'cline': return await spawnSimple('cline', ['-p', JSON.stringify(caseYaml.input)], caseYaml, opts);
+    case 'dify': return await executeHttpDryRun(capDir, caseYaml, opts);
+    default: throw new Error(`unsupported platform runner: ${platform}`);
+  }
+}
+
+/**
+ * Spawn a platform CLI with a single input argument (single-turn; multi-turn
+ * remains claude-code-only via stream-json in executeClaudeDryRun). Uses spawn
+ * (async, supports timeout + streamed stderr) with argv form (no shell — Windows
+ * compatible + §B.3 RCE guard).
+ */
+async function spawnSimple(bin, args, caseYaml, opts = {}) {
+  const spawn = await _getSpawn();
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: opts.timeout_ms || caseYaml.timeout_ms || 30000,
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', () => reject(new Error(`${bin} CLI not available`)));
+    proc.on('close', (code) => {
+      if (code !== 0 && code !== null) reject(new Error(`${bin} exited ${code}: ${stderr.slice(0, 200)}`));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+/**
+ * Execute a claude-code dry-run of the capability for a test case.
+ * P1: spawn `claude -p` with the capability body as system prompt.
+ * P1-A: if caseYaml.turns is non-empty, dispatch to multi-turn stream-json runner.
+ * P1-D: opts.baselineSystemPrompt overrides entrypoint systemPrompt (benchmark).
+ * Falls back to static-only if claude not available.
+ *
+ * Phase 4 P2-A: renamed from executeDryRun to executeClaudeDryRun (kept
+ * backward-compat alias). executeCliDryRun dispatches by platform.
+ */
+export async function executeClaudeDryRun(capDir, caseYaml, opts) {
+  // Phase 4 P1-A: multi-turn dispatch.
+  if (Array.isArray(caseYaml.turns) && caseYaml.turns.length > 0) {
+    return await executeMultiTurnDryRun(capDir, caseYaml, opts);
+  }
   const cap = parseCapability(capDir);
   const y = cap.yaml;
   if (!y) throw new Error('cannot parse capability');
@@ -355,7 +525,9 @@ async function executeDryRun(capDir, caseYaml, opts) {
 
   // Get body content (system prompt)
   let systemPrompt = '';
-  if (y.entrypoint) {
+  if (opts.baselineSystemPrompt) {
+    systemPrompt = opts.baselineSystemPrompt; // P1-D benchmark: skip entrypoint read.
+  } else if (y.entrypoint) {
     const epPath = path.join(capDir, y.entrypoint);
     if (fs.existsSync(epPath)) {
       systemPrompt = fs.readFileSync(epPath, 'utf8');
@@ -364,8 +536,8 @@ async function executeDryRun(capDir, caseYaml, opts) {
 
   const userMessage = JSON.stringify(caseYaml.input);
 
-  // Spawn claude -p
-  const { spawn } = await import('node:child_process');
+  // Spawn claude -p (Phase 4 P2-A: use _getSpawn for test injection).
+  const spawn = await _getSpawn();
   return new Promise((resolve, reject) => {
     const proc = spawn('claude', ['-p', `--system-prompt=${systemPrompt}`, userMessage], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -383,6 +555,142 @@ async function executeDryRun(capDir, caseYaml, opts) {
         resolve(stdout.trim());
       }
     });
+  });
+}
+
+// Phase 4 P1-A: spawn injection point for multi-turn tests. Tests can stub the
+// spawn function via _setSpawn(fn); null restores default dynamic import.
+let _spawnOverride = null;
+export function _setSpawn(fn) { _spawnOverride = fn; }
+async function _getSpawn() {
+  if (_spawnOverride) return _spawnOverride;
+  const { spawn } = await import('node:child_process');
+  return spawn;
+}
+
+/**
+ * Multi-turn dry-run (Phase 4 P1-A): spawn `claude -p --input-format stream-json
+ * --output-format stream-json --include-partial-messages`. Send each user turn
+ * as a JSON user message line on stdin; read stdout stream-json lines until an
+ * assistant result message arrives. Apply post_condition.{must_contain_any,
+ * on_fail} between turns. Windows-safe: spawn argv form + Buffer stdin writes.
+ *
+ * @param {string} capDir
+ * @param {Object} caseYaml  must have turns: [{role, content, post_condition?}]
+ * @param {Object} opts  {timeout_ms?, baselineSystemPrompt?}
+ * @returns {Promise<string>}  last assistant turn content (becomes `actual`)
+ */
+export async function executeMultiTurnDryRun(capDir, caseYaml, opts = {}) {
+  const cap = parseCapability(capDir);
+  const y = cap.yaml;
+  let systemPrompt = (y && y.entrypoint && fs.existsSync(path.join(capDir, y.entrypoint)))
+    ? fs.readFileSync(path.join(capDir, y.entrypoint), 'utf8')
+    : '';
+  if (opts.baselineSystemPrompt) systemPrompt = opts.baselineSystemPrompt;
+  const spawn = await _getSpawn();
+  const argv = ['claude', '-p', `--system-prompt=${systemPrompt}`,
+    '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages'];
+  return new Promise((resolve, reject) => {
+    const proc = spawn(argv[0], argv.slice(1), {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: opts.timeout_ms || caseYaml.timeout_ms || 30000,
+    });
+    let stdoutBuf = '';
+    let lastAssistantText = '';
+    let turnIdx = 0;
+    let skipping = false;
+    let settled = false;
+
+    const sendTurn = (idx) => {
+      if (idx >= caseYaml.turns.length) {
+        try { proc.stdin.end(); } catch { /* closed */ }
+        return;
+      }
+      const t = caseYaml.turns[idx];
+      if (t.role !== 'user') {
+        sendTurn(idx + 1);
+        return;
+      }
+      const payload = JSON.stringify({ type: 'user', message: { role: 'user', content: t.content } }) + '\n';
+      try { proc.stdin.write(payload); } catch (e) { reject(new Error(`stdin write failed: ${e.message}`)); }
+    };
+
+    proc.stdout.on('data', (d) => {
+      stdoutBuf += d.toString();
+      let nl;
+      while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
+        const line = stdoutBuf.slice(0, nl).trim();
+        stdoutBuf = stdoutBuf.slice(nl + 1);
+        if (!line) continue;
+        let msg;
+        try { msg = JSON.parse(line); } catch { continue; }
+        if (msg.type === 'assistant' && msg.message && msg.message.content) {
+          const text = Array.isArray(msg.message.content)
+            ? msg.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('')
+            : String(msg.message.content);
+          if (text) lastAssistantText = text;
+        } else if (msg.type === 'result') {
+          if (settled) {
+            turnIdx++;
+          } else if (skipping) {
+            // pc eval disabled after a prior on_fail:skip — just advance by 1;
+            // sendTurn will recurse past any assistant turns.
+            turnIdx++;
+          } else {
+            // Phase 4 fix (#1): evaluate pc on the current user turn AND on any
+            // immediately-following assistant turns whose pc targets THIS
+            // response (the assistant turn is a marker for the model's reply
+            // to the preceding user turn). Previously, result handler indexed
+            // caseYaml.turns[turnIdx] while sendTurn had already recursed past
+            // assistant turns → assistant-turn pc was never evaluated (false pass).
+            const turn = caseYaml.turns[turnIdx];
+            if (turn && turn.post_condition) {
+              const hit = turn.post_condition.must_contain_any.some((s) => lastAssistantText.includes(s));
+              if (!hit) {
+                if (turn.post_condition.on_fail === 'fail') {
+                  settled = true;
+                  try { proc.kill(); } catch {}
+                  reject(new Error(`post_condition fail at turn ${turnIdx}: missing ${turn.post_condition.must_contain_any.join('|')}`));
+                  return;
+                }
+                skipping = true;
+              }
+            }
+            // Advance past consecutive assistant turns whose pc targets this
+            // same lastAssistantText (the response to the current user turn).
+            let next = turnIdx + 1;
+            while (next < caseYaml.turns.length && caseYaml.turns[next].role === 'assistant') {
+              const aTurn = caseYaml.turns[next];
+              if (aTurn.post_condition) {
+                const aHit = aTurn.post_condition.must_contain_any.some((s) => lastAssistantText.includes(s));
+                if (!aHit) {
+                  if (aTurn.post_condition.on_fail === 'fail') {
+                    settled = true;
+                    try { proc.kill(); } catch {}
+                    reject(new Error(`post_condition fail at turn ${next}: missing ${aTurn.post_condition.must_contain_any.join('|')}`));
+                    return;
+                  }
+                  skipping = true;
+                }
+              }
+              next++;
+            }
+            turnIdx = next;
+          }
+          if (turnIdx < caseYaml.turns.length) sendTurn(turnIdx);
+          else { try { proc.stdin.end(); } catch {} }
+        }
+      }
+    });
+    proc.stderr.on('data', () => { /* capture but don't fail */ });
+    proc.on('error', (e) => { if (!settled) { settled = true; reject(e); } });
+    proc.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      if (code !== 0 && code !== null) reject(new Error(`claude stream-json exited ${code}`));
+      else resolve(lastAssistantText.trim());
+    });
+    sendTurn(0);
   });
 }
 
