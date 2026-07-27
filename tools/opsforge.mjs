@@ -131,12 +131,13 @@ export async function cmdMenu(rl, opts = {}) {
     '  4) 诊断问题（已装的能力出毛病了）',
     '  5) 查看能力报告（流转进度 / 体检）',
     '  6) 反馈（给能力打分）',
+    '  7) 浏览仓库全部能力（清单 + 适用场景）',
     '  0) 退出',
     '----------------------------------------',
   ].join('\n'));
   while (true) {
     menu();
-    const choice = (await ask('请选择 [0-6]: ')).trim();
+    const choice = (await ask('请选择 [0-7]: ')).trim();
     if (choice === '0' || choice === '' || choice === 'quit' || choice === 'exit') return 0;
     if (choice === 'menu' || choice === 'back') continue;
     try {
@@ -147,8 +148,9 @@ export async function cmdMenu(rl, opts = {}) {
         case '4': await cmdDoctorFlow(rl, opts); break;
         case '5': await cmdStatusFlow(rl, opts); break;
         case '6': await cmdFeedback(rl, opts); break;
+        case '7': await cmdDiscover({ ...opts, all: true }); break;
         default:
-          console.log('没看懂这个选项，请输入 0 到 6 之间的数字。');
+          console.log('没看懂这个选项，请输入 0 到 7 之间的数字。');
       }
     } catch (e) {
       console.log(`[黄] ${e.message}`);
@@ -225,10 +227,20 @@ export async function cmdWizard(rl, opts = {}) {
 }
 
 /** opsforge discover — §22.10 改读 per-project manifest（修审计 #1 语义错）。
- *  渲染质量灯 + [黄 不可商用] 商用标签 + 触发方式。 */
+ *  渲染质量灯 + [黄 不可商用] 商用标签 + 触发方式。
+ *  `discover --all`：全局仓库能力总览（从 registry + body H2 章节派生），
+ *  与 per-project "已装能力" 语义分层。 */
 export async function cmdDiscover(argsOrOpts) {
   // 兼容两种调用：main(['discover']) 传 argv 数组；菜单分支传 opts 对象。
   const opts = Array.isArray(argsOrOpts) ? parseSimpleOpts(argsOrOpts) : (argsOrOpts || {});
+  // --all：全局仓库能力总览（非 per-project 已装清单）。
+  if (opts.all) {
+    const { buildInventory, renderDiscoverAll } = await import('./inventory.mjs');
+    const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+    const inv = await buildInventory({ repoRoot: workDir, includeDrafts: !!opts.includeDrafts });
+    console.log(renderDiscoverAll(inv, { lang: 'zh' }));
+    return 0;
+  }
   const project = opts.project || 'default';
   const opsforgeHome = opts.opsforgeHome || resolveOpsforgeHome();
   const manifestPath = path.join(opsforgeHome, 'manifests', `${project}.manifest.json`);

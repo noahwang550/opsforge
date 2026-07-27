@@ -604,6 +604,60 @@ export function checkNoSelfCheatInBody(cap) {
   return { name: 'no_self_cheat_in_body', status: 'pass', detail: '' };
 }
 
+// R_scenario: staged+ body must carry non-empty "## 能力说明" and "## 适用场景" H2
+// sections. The capability inventory (tools/inventory.mjs) extracts these same sections
+// to render the README capability table and `opsforge discover --all`, so the rule
+// guarantees the inventory never silently degrades to a bare description for
+// released/staged caps. Applies to staged+ (drafts are still being filled — exempt,
+// like R16–R22). Pure function so inventory.mjs + tests can reuse it.
+export function extractH2Section(text, heading) {
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let capturing = false;
+  const out = [];
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      if (capturing) break; // next H2 ends the section
+      if (line.slice(3).trim() === heading) capturing = true;
+      continue;
+    }
+    if (capturing) out.push(line);
+  }
+  return out.join('\n').trim();
+}
+
+// Resolve the body file: entrypoint for agent/skill/mcp (frontmatter stripped),
+// README.md for workflow/bundle (no frontmatter, no entrypoint).
+function bodyFilePath(cap) {
+  const y = cap.yaml;
+  if (y && y.entrypoint) return path.join(cap.dir, y.entrypoint);
+  return path.join(cap.dir, 'README.md');
+}
+
+function readBodyMarkdown(cap) {
+  const p = bodyFilePath(cap);
+  if (!fs.existsSync(p)) return '';
+  let raw = readText(p);
+  const m = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
+  if (m) raw = m[1];
+  return raw;
+}
+
+export function checkScenarioSections(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'scenario_sections', status: 'pass', detail: '' };
+  const body = readBodyMarkdown(cap);
+  const desc = extractH2Section(body, '能力说明');
+  if (!desc) {
+    return { name: 'scenario_sections', status: 'fail', detail: `scenario_sections: body missing non-empty "## 能力说明" section (see templates)` };
+  }
+  const scen = extractH2Section(body, '适用场景');
+  if (!scen) {
+    return { name: 'scenario_sections', status: 'fail', detail: `scenario_sections: body missing non-empty "## 适用场景" section (see templates)` };
+  }
+  return { name: 'scenario_sections', status: 'pass', detail: '' };
+}
+
 // R_wf_ref: workflow steps[].capability resolvable + outputs align with vars
 export function checkWorkflowRef(cap, allCaps) {
   const y = cap.yaml;
@@ -796,6 +850,8 @@ export function validateDir(dir, opts = {}) {
   checks.push(checkDescriptionBodyAlignment(cap));
   checks.push(checkTestExpectDeclared(cap));
   checks.push(checkNoSelfCheatInBody(cap));
+  // R_scenario: staged+ body carries "## 能力说明" + "## 适用场景" for the inventory.
+  checks.push(checkScenarioSections(cap));
   // v7 §20.1 workflow structural rules (staged-only)
   checks.push(checkWorkflowRef(cap, allCaps));
   checks.push(checkWorkflowClosed(cap));
@@ -825,8 +881,17 @@ export function scanCapabilities(root) {
   if (fs.existsSync(customersDir)) {
     for (const brand of fs.readdirSync(customersDir, { withFileTypes: true })) {
       if (!brand.isDirectory()) continue;
-      roots.push(path.join(customersDir, brand.name, 'packs', '_drafts'));
-      roots.push(path.join(customersDir, brand.name, 'packs', '_staged'));
+      const brandPacks = path.join(customersDir, brand.name, 'packs');
+      if (!fs.existsSync(brandPacks)) continue;
+      roots.push(path.join(brandPacks, '_drafts'));
+      roots.push(path.join(brandPacks, '_staged'));
+      // formal brand caps: customers/<brand>/packs/<brand-slug>/... (aligns with
+      // release.mjs collectCapDirs; previously validate missed formal brand caps).
+      for (const ent of fs.readdirSync(brandPacks, { withFileTypes: true })) {
+        if (!ent.isDirectory()) continue;
+        if (['_drafts', '_staged', '_third-party'].includes(ent.name)) continue;
+        roots.push(path.join(brandPacks, ent.name));
+      }
     }
   }
   // Also scan formal dirs: packs/<contributor-slug>/ (excluding _drafts/_staged/_third-party)

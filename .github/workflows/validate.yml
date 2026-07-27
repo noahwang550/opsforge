@@ -21,6 +21,8 @@ jobs:
         run: node tools/eval.mjs --all
       - name: Run release --all (§B.4 3-report gate)
         run: node tools/release.mjs --all
+      - name: Inventory README drift gate (capability inventory SSOT)
+        run: node tools/inventory.mjs --check-readme
 
   # Phase 2.1: per-platform install doctor matrix (claude-code/cursor/codex/cline).
   # Tier-1 platforms must report healthy; Tier-2 platforms only need the adapter
