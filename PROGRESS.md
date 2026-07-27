@@ -1,7 +1,7 @@
 # OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
-> **Last Updated:** 2026-07-24
+> **Last Updated:** 2026-07-27
 > Authoritative sources: `PLAN.md` (v9 spec, §6/§7/§8/§13/§A/§B/§C/§14/§20/§21/§22), `docs/design-archive/supplement-v7.md` / `supplement-v8.md` / `supplement-v9.md`, `ARCHITECTURE-DELTA.md` (Phase 1 contracts), `IMPLEMENTATION-PLAN.md` (sub-phase build order), `DESIGN.md` (Phase 0 blueprint + Phase 1 additions). This file records *what was actually built* vs those specs.
 
 ## Phase 0 — COMPLETE
@@ -350,3 +350,13 @@ Phase 1's `validate.mjs` (R16–R22 + runSuite), `release.mjs` (now 3-report gat
 | **D6** third-party intake scope (minimal vs full) | **CONFIRMED by steering 2026-07-24** — full intake (Phase 3.4) is the delivered scope; no longer deferred. |
 | **Tier2-min spec nuance** (`base.mjs tier()` Tier2-min edge case) | **RESOLVED + shipped 2026-07-24** — `tier()` tightened to §22.3 "至少 2 个文件/配置类": Tier2 = prompt_exec + ≥2 of the other 5; prompt_exec + 0–1 → Tier3. Test `A1c`. |
 | **`pickVersion` wiring** (`resolve-profile.mjs` semver-range intersection) | **DEFERRED to Phase 4 by steering 2026-07-24** — single-version registry pin stays; multi-version range-intersection lands with the remote `index.json` registry. |
+
+## 经验教训（2026-07-27 capability-inventory 会话）
+
+本次做"动态能力清单"特性时暴露出一批 CI/工程纪律的预存问题，记录如下以防复发：
+
+1. **CI workflow 放错目录＝没生效**。`ci/github-actions/*.yml` 是影子副本，GitHub Actions 只跑 `.github/workflows/*.yml`。本次给 `ci/github-actions/validate.yml` 加 `--check-readme` 步骤等于没加，CI 一直没跑它。**教训：改 CI 必须改 `.github/workflows/`；不要维护两份重复 workflow（已删 `ci/github-actions/` 影子副本）。**
+2. **guardrails 从未在 CI 生效**。`ci/guardrails.yml`（path-guard / deps-guard / entry-guard / markdownlint）一直放在 `ci/`，GitHub 不跑，导致项目宣传的"steering-owned 路径守卫"实际从未执行。连带两个 bug 一直没暴露：① markdownlint 基线 1332 条违规（含扫 `node_modules`）；② entry-guard job 漏 `npm ci`（validate.mjs import ajv 失败）。**教训：加 CI workflow 后必须 push 一个会触发它的 PR，确认它真的在跑且绿，不能假设放对了地方。** 本次已把 guardrails 搬到 `.github/workflows/`、修 markdownlint scoping（`.markdownlintignore` 排除 node_modules/历史 archive/渲染模板/系统提示 body/steering 设计记录）、补 entry-guard 的 `npm ci`。
+3. **新加 validate R-rule 必须全量跑测试**。新增 `R_scenario`（checkScenarioSections，要求 body 含 `## 能力说明` + `## 适用场景`）后，`tools/validate.test.mjs` 的 `makeCap` fixture 和 `tools/new-capability.test.mjs` 的 brand-skill fixture 都因为 body 是纯文本 blob（无 H2 章节）而挂了。**教训：加任何新的 staged+ 验证规则后，必须跑 bare `node --test`（不带 glob）确认所有现有 fixture 仍绿；fixture 写 body 时要包含新规则要求的结构。**
+4. **扫描逻辑要保持一致**。`validate.mjs` 的 `scanCapabilities` 原本只扫 `customers/<brand>/packs/_drafts` 和 `_staged`，漏扫正式品牌目录 `customers/<brand>/packs/<brand-slug>/`，与 `release.mjs` 的 `collectCapDirs` 不一致——导致 inventory 漏掉正式品牌能力，也意味着正式品牌能力从未被 `validate --all` 覆盖。**教训：所有"扫能力目录"的逻辑（validate/release/inventory）扫描范围必须一致，最好共用一个扫描函数。** 本次已对齐 `scanCapabilities` 扫正式品牌目录。
+5. **markdownlint 配置 vs scoping**。`config-protection` hook 会挡对 `.markdownlint.json`（规则配置）的放松改动，要求"改源文件不放松配置"——这是对的纪律。修违规应优先 `markdownlint --fix` 自动修 + 源文件手动修；对确实不该被某规则覆盖的文件（系统提示 body、渲染模板、历史 archive），用 `.markdownlintignore` 做 scoping（不是放松规则）。
