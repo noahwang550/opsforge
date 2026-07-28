@@ -3,3 +3,8 @@ input:
   capId: foo.bar
 expect: contains
 expected: 选平台选拷贝范围确认依赖确认安装
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

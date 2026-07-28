@@ -16,6 +16,17 @@ export const SUPPORTED_MODES = new Set(['exact', 'contains', 'human', 'schema', 
 // Phase 2.2: all modes now implemented; STUB_MODES removed.
 
 /**
+ * Strip a leading YAML frontmatter block (---\n...\n---) from a markdown file
+ * and return the body. methodology §5.3 P1-4: the body — not the whole file —
+ * is what gets passed to --system-prompt. Shared by executeClaudeDryRun and
+ * executeMultiTurnDryRun (previously each inlined the same regex).
+ */
+function stripFrontmatter(raw) {
+  const m = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
+  return m ? m[1].trim() : raw.trim();
+}
+
+/**
  * Detect if we should run in static-only mode.
  * OPSFORGE_RUNNER=static-only OR claude not on PATH.
  */
@@ -396,7 +407,7 @@ export async function runCase(capDir, caseYaml, opts = {}) {
   // claude runner: execute dry-run then compare (Phase 4 P2-A: dispatch by platform).
   let actual = '';
   try {
-    actual = await executeCliDryRun(platform, capDir, caseYaml, opts);
+    actual = await executeCliDryRun(platform, capDir, caseYaml, { ...opts, capDir });
   } catch (e) {
     return {
       case: caseYaml.name || '<unnamed>',
@@ -523,14 +534,15 @@ export async function executeClaudeDryRun(capDir, caseYaml, opts) {
     throw new Error('workflow dry-run is not supported in Phase 1 (static-only)');
   }
 
-  // Get body content (system prompt)
+  // Get body content (system prompt) — strip frontmatter (methodology §5.3 P1-4):
+  // previously the whole file incl. frontmatter was passed to --system-prompt.
   let systemPrompt = '';
   if (opts.baselineSystemPrompt) {
     systemPrompt = opts.baselineSystemPrompt; // P1-D benchmark: skip entrypoint read.
   } else if (y.entrypoint) {
     const epPath = path.join(capDir, y.entrypoint);
     if (fs.existsSync(epPath)) {
-      systemPrompt = fs.readFileSync(epPath, 'utf8');
+      systemPrompt = stripFrontmatter(fs.readFileSync(epPath, 'utf8'));
     }
   }
 
@@ -583,10 +595,13 @@ async function _getSpawn() {
 export async function executeMultiTurnDryRun(capDir, caseYaml, opts = {}) {
   const cap = parseCapability(capDir);
   const y = cap.yaml;
-  let systemPrompt = (y && y.entrypoint && fs.existsSync(path.join(capDir, y.entrypoint)))
-    ? fs.readFileSync(path.join(capDir, y.entrypoint), 'utf8')
-    : '';
-  if (opts.baselineSystemPrompt) systemPrompt = opts.baselineSystemPrompt;
+  // methodology §5.3 P1-4: strip frontmatter before using body as system prompt.
+  let systemPrompt = '';
+  if (opts.baselineSystemPrompt) {
+    systemPrompt = opts.baselineSystemPrompt;
+  } else if (y && y.entrypoint && fs.existsSync(path.join(capDir, y.entrypoint))) {
+    systemPrompt = stripFrontmatter(fs.readFileSync(path.join(capDir, y.entrypoint), 'utf8'));
+  }
   const spawn = await _getSpawn();
   const argv = ['claude', '-p', `--system-prompt=${systemPrompt}`,
     '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages'];
@@ -600,6 +615,7 @@ export async function executeMultiTurnDryRun(capDir, caseYaml, opts = {}) {
     let turnIdx = 0;
     let skipping = false;
     let settled = false;
+    const tokenUsage = { input: 0, output: 0 };
 
     const sendTurn = (idx) => {
       if (idx >= caseYaml.turns.length) {
@@ -630,6 +646,11 @@ export async function executeMultiTurnDryRun(capDir, caseYaml, opts = {}) {
             : String(msg.message.content);
           if (text) lastAssistantText = text;
         } else if (msg.type === 'result') {
+          // methodology §5.4: parse stream-json usage → tokenUsage (cost tracking).
+          if (msg.usage) {
+            if (typeof msg.usage.input_tokens === 'number') tokenUsage.input += msg.usage.input_tokens;
+            if (typeof msg.usage.output_tokens === 'number') tokenUsage.output += msg.usage.output_tokens;
+          }
           if (settled) {
             turnIdx++;
           } else if (skipping) {
@@ -687,6 +708,11 @@ export async function executeMultiTurnDryRun(capDir, caseYaml, opts = {}) {
     proc.on('close', (code) => {
       if (settled) return;
       settled = true;
+      // Sink accumulated tokens into the run-level accumulator (methodology §5.4).
+      if (opts.tokenSink) {
+        opts.tokenSink.input += tokenUsage.input;
+        opts.tokenSink.output += tokenUsage.output;
+      }
       if (code !== 0 && code !== null) reject(new Error(`claude stream-json exited ${code}`));
       else resolve(lastAssistantText.trim());
     });
@@ -717,13 +743,15 @@ export async function runSuite(capDir, opts = {}) {
 
   // Run each case
   const verdicts = [];
+  const tokenSink = { input: 0, output: 0 }; // methodology §5.4 run-level token accumulator
   for (const c of cases) {
-    const v = await runCase(capDir, c, { ...opts, runner, platform });
+    const v = await runCase(capDir, c, { ...opts, runner, platform, tokenSink });
     verdicts.push(v);
   }
 
   // Build summary
   const summary = buildSummary(verdicts, runner);
+  summary.token_total = tokenSink.input + tokenSink.output;
 
   // Write run artifacts (under ~/.opsforge/runs/<eval-id>/)
   const evalId = opts.evalId || `run-${Date.now()}`;

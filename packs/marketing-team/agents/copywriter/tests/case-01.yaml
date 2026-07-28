@@ -1,5 +1,10 @@
 name: case-001
 input:
   topic: summer sale
-expect: exact
+expect: contains
 expected: summer sale campaign copy with discount highlights
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

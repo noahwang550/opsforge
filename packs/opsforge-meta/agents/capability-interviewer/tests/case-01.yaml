@@ -1,0 +1,13 @@
+name: anti-anchoring-rejects-mismatch
+input:
+  recall: 我上次先拉数据再发审最后发出去
+  draft: 直接生成文案发布
+expect: contains
+expected:
+  - 对不上
+  - 按你回忆的记
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

@@ -1,0 +1,17 @@
+id: opsforge-meta.capability-distiller
+version: 1.0.0
+kind: agent
+pack: opsforge-meta
+owner: steering
+display_name: Capability Distiller
+display_name_zh: 能力蒸馏器
+display_name_en: Capability Distiller
+description: distiller agent that reads interview.md, infers the capability kind (shape inference with rationale + C12 business-language mapping), scaffolds via new-capability.mjs, overwrites business fields + dual artifacts (run instruction + distill log), gives quadrant/source/confidence defaults for author confirmation, and refuses to fabricate handling for uncovered quadrants
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+depends_on: []
+source:
+  origin: original
+  upstream_ref: null

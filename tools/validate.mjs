@@ -29,7 +29,9 @@ const PLACEHOLDER_TOKENS = ['__FILL_ME__', 'TODO', 'FIXME'];
 // Phase 2.2: eval-report.json is the 3rd CI artifact (§21.4), also excluded.
 // Phase 4 P1-D: benchmark-report.json is advisory (not in release gate) but must be
 // excluded from skeleton_guard to avoid R8 false positive.
-const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json'];
+// Twin: tools/new-capability.mjs SKELETON_GUARD_EXCLUSIONS — kept in sync deliberately
+// (that copy omits `benchmark-report.json` because scaffold/promote only see draft dirs).
+const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json', 'interview.md'];
 /** Test hook: returns the current exclusions list (read-only snapshot). */
 export function SKELETON_GUARD_EXCLUSIONS_GET() {
   return [...SKELETON_GUARD_EXCLUSIONS];
@@ -623,6 +625,291 @@ export function checkTurnsWellFormed(cap) {
   return { name: 'test_turns_well_formed', status: 'pass', detail: '' };
 }
 
+// R24 process_stages_present (staged+ sibling to R23; methodology §8).
+// kind-specific: skill=## 运行流程 ≥2 步骤含 数据:/决策:/交付工件:; agent=## 角色设定 非空;
+// mcp=## 工具面 非空 + tools: 非空; workflow=steps≥2.
+function splitStepBlocks(sec) {
+  if (!sec) return [];
+  const lines = sec.split(/\r?\n/);
+  const blocks = [];
+  let cur = null;
+  for (const line of lines) {
+    if (/^###\s*步骤/.test(line)) {
+      if (cur) blocks.push(cur);
+      cur = [line];
+    } else if (cur) {
+      cur.push(line);
+    }
+  }
+  if (cur) blocks.push(cur);
+  return blocks;
+}
+export function checkProcessStagesPresent(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'process_stages_present', status: 'pass', detail: '' };
+  const kind = y.kind;
+  const body = readBodyMarkdown(cap);
+  if (kind === 'skill') {
+    const sec = extractH2Section(body, '运行流程');
+    if (!sec) return { name: 'process_stages_present', status: 'fail', detail: 'process_stages_present: skill body missing "## 运行流程" section' };
+    // splitStepBlocks groups lines by `### 步骤` headings — its length IS the
+    // 步骤 count (the separate .filter(/^###\s*步骤/) was a redundant pass).
+    const blocks = splitStepBlocks(sec);
+    if (blocks.length < 2) return { name: 'process_stages_present', status: 'fail', detail: `process_stages_present: "## 运行流程" needs ≥2 "### 步骤" headings, got ${blocks.length}` };
+    for (let i = 0; i < blocks.length; i++) {
+      if (!/(数据:|决策:|交付工件:|人工闸门:)/.test(blocks[i].join('\n'))) {
+        return { name: 'process_stages_present', status: 'fail', detail: `process_stages_present: 步骤 ${i + 1} missing 数据:/决策:/交付工件: marker` };
+      }
+    }
+    return { name: 'process_stages_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'agent') {
+    const sec = extractH2Section(body, '角色设定');
+    if (!sec || sec.trim().length === 0) return { name: 'process_stages_present', status: 'fail', detail: 'process_stages_present: agent body missing non-empty "## 角色设定" section' };
+    return { name: 'process_stages_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'mcp') {
+    const sec = extractH2Section(body, '工具面');
+    if (!sec || sec.trim().length === 0) return { name: 'process_stages_present', status: 'fail', detail: 'process_stages_present: mcp body missing non-empty "## 工具面" section' };
+    if (!Array.isArray(y.tools) || y.tools.length === 0) return { name: 'process_stages_present', status: 'fail', detail: 'process_stages_present: mcp manifest "tools:" array empty' };
+    return { name: 'process_stages_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'workflow') {
+    if (!Array.isArray(y.steps) || y.steps.length < 2) return { name: 'process_stages_present', status: 'fail', detail: `process_stages_present: workflow needs ≥2 steps, got ${y.steps ? y.steps.length : 0}` };
+    return { name: 'process_stages_present', status: 'pass', detail: '' };
+  }
+  return { name: 'process_stages_present', status: 'n/a', detail: '' };
+}
+
+// R24b degradation_present (staged+).
+export function checkDegradationPresent(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'degradation_present', status: 'pass', detail: '' };
+  const kind = y.kind;
+  const body = readBodyMarkdown(cap);
+  if (kind === 'skill') {
+    const sec = extractH2Section(body, '失败降级');
+    if (!sec) return { name: 'degradation_present', status: 'fail', detail: 'degradation_present: skill body missing "## 失败降级" section' };
+    const items = sec.split(/\r?\n/).filter((l) => /^\s*-\s+/.test(l) && !/^\s*-\s*__FILL_ME__/.test(l));
+    if (items.length < 1) return { name: 'degradation_present', status: 'fail', detail: 'degradation_present: "## 失败降级" needs ≥1 list item' };
+    return { name: 'degradation_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'agent') {
+    const sec = extractH2Section(body, '边界');
+    if (!sec || sec.trim().length === 0) return { name: 'degradation_present', status: 'fail', detail: 'degradation_present: agent body missing non-empty "## 边界" section' };
+    return { name: 'degradation_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'mcp') {
+    const sec = extractH2Section(body, '异常处理');
+    if (!sec || sec.trim().length === 0) return { name: 'degradation_present', status: 'fail', detail: 'degradation_present: mcp body missing non-empty "## 异常处理" section' };
+    return { name: 'degradation_present', status: 'pass', detail: '' };
+  }
+  if (kind === 'workflow') {
+    for (const step of (y.steps || [])) {
+      if (step && step.checkpoint) continue; // checkpoint is itself a HITL gate
+      if (step && step.on_error !== undefined) {
+        if (step.on_error === null || step.on_error === '' || step.on_error === false) {
+          return { name: 'degradation_present', status: 'fail', detail: `degradation_present: step "${step.id}" declares on_error without a degradation action` };
+        }
+      }
+    }
+    return { name: 'degradation_present', status: 'pass', detail: '' };
+  }
+  return { name: 'degradation_present', status: 'n/a', detail: '' };
+}
+
+// R25 depends_declared (staged+): bidirectional body ## 依赖 ↔ frontmatter depends_on.
+const CAPID_RE = /^[a-z][a-z0-9-]+\.[a-z0-9-]+(@[0-9.]+)?$/;
+export function checkDependsDeclared(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'depends_declared', status: 'pass', detail: '' };
+  if (!['agent', 'skill', 'mcp', 'workflow', 'bundle'].includes(y.kind)) return { name: 'depends_declared', status: 'n/a', detail: '' };
+  const body = readBodyMarkdown(cap);
+  const depSec = extractH2Section(body, '依赖');
+  const bodyBases = new Set();
+  if (depSec) {
+    for (const line of depSec.split(/\r?\n/)) {
+      // strip leading list marker "- " before matching capId
+      const stripped = line.replace(/^\s*-\s*/, '').trim();
+      const m = stripped.match(CAPID_RE);
+      if (m) bodyBases.add(m[0].split('@')[0]);
+    }
+  }
+  const declared = Array.isArray(y.depends_on) ? y.depends_on : [];
+  const declaredBases = new Set(declared.map((d) => String(d).split('@')[0]));
+  for (const b of bodyBases) {
+    if (!declaredBases.has(b)) {
+      return { name: 'depends_declared', status: 'fail', detail: `depends_declared: body "## 依赖" mentions "${b}" but not in depends_on` };
+    }
+  }
+  for (const d of declared) {
+    const base = String(d).split('@')[0];
+    if (!bodyBases.has(base)) {
+      return { name: 'depends_declared', status: 'fail', detail: `depends_declared: depends_on "${d}" not mentioned in body "## 依赖"` };
+    }
+  }
+  return { name: 'depends_declared', status: 'pass', detail: '' };
+}
+
+// R26 test_four_quadrants (staged+). Hard: ≥1 positive + ≥1 boundary + ≥1(negative|degradation);
+// staged positive source ∈ {real, recalled(≤med→ high|med)}. Soft (warn): case name vs
+// quadrant business-language keyword alignment. Keyword set derives from docs/methodology/
+// capability-creation.md C12 table (J.5).
+const QUADRANT_KEYWORDS = {
+  positive: ['正常', '顺利', '成功', 'positive'],
+  boundary: ['边界', '极端', '特殊', 'boundary'],
+  negative: ['拒绝', '不该', '非法', '负例', '失败返回', 'negative'],
+  degradation: ['降级', '兜底', '上游挂', 'degradation'],
+};
+export function checkTestFourQuadrants(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'test_four_quadrants', status: 'pass', detail: '' };
+  const cases = readTestCases(cap);
+  if (cases.length === 0) return { name: 'test_four_quadrants', status: 'n/a', detail: '' };
+  let pos = 0, bnd = 0, negdeg = 0;
+  for (const c of cases) {
+    if (c.quadrant === 'positive') pos++;
+    else if (c.quadrant === 'boundary') bnd++;
+    else if (c.quadrant === 'negative' || c.quadrant === 'degradation') negdeg++;
+  }
+  if (pos < 1 || bnd < 1 || negdeg < 1) {
+    return { name: 'test_four_quadrants', status: 'fail', detail: `test_four_quadrants: need ≥1 positive + ≥1 boundary + ≥1(negative|degradation); got positive=${pos} boundary=${bnd} neg/deg=${negdeg}` };
+  }
+  for (const c of cases) {
+    if (c.quadrant !== 'positive') continue;
+    const src = c.source;
+    if (src === 'synthetic' || src === 'llm_drafted_confirmed') {
+      return { name: 'test_four_quadrants', status: 'fail', detail: `test_four_quadrants: ${c.file} positive source "${src}" not allowed (staged positive must be real|recalled)` };
+    }
+    if (src !== 'real' && src !== 'recalled') {
+      return { name: 'test_four_quadrants', status: 'fail', detail: `test_four_quadrants: ${c.file} positive source missing/invalid ("${src}"); staged positive must be real|recalled` };
+    }
+    if (src === 'recalled' && c.confidence === 'low') {
+      return { name: 'test_four_quadrants', status: 'fail', detail: `test_four_quadrants: ${c.file} positive recalled+low not allowed (need high|med)` };
+    }
+  }
+  // Soft keyword alignment (warn only — does not fail verdict).
+  const misses = [];
+  for (const c of cases) {
+    if (!c.quadrant) continue;
+    const kws = QUADRANT_KEYWORDS[c.quadrant] || [];
+    const hay = String(c.name || '').toLowerCase();
+    if (!kws.some((k) => hay.includes(k.toLowerCase()))) misses.push(`${c.file}(${c.quadrant})`);
+  }
+  if (misses.length > 0) {
+    return { name: 'test_four_quadrants', status: 'warn', detail: `test_four_quadrants: case-name vs quadrant keyword soft-miss [${misses.join(', ')}]` };
+  }
+  return { name: 'test_four_quadrants', status: 'pass', detail: '' };
+}
+
+// R27 run_instruction_present (staged+): body ## 运行指令 countBodyTokens ≥80.
+export function checkRunInstructionPresent(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'run_instruction_present', status: 'pass', detail: '' };
+  if (!['agent', 'skill', 'mcp'].includes(y.kind)) return { name: 'run_instruction_present', status: 'n/a', detail: '' };
+  const sec = extractH2Section(readBodyMarkdown(cap), '运行指令');
+  if (!sec) return { name: 'run_instruction_present', status: 'fail', detail: 'run_instruction_present: body missing "## 运行指令" section' };
+  const cnt = countBodyTokens(sec);
+  if (cnt < 80) return { name: 'run_instruction_present', status: 'fail', detail: `run_instruction_present: "## 运行指令" has ${cnt} tokens, need ≥80` };
+  return { name: 'run_instruction_present', status: 'pass', detail: '' };
+}
+
+// R28 expect_mode_kind_safe (staged+): positive+exact requires allow_exact_reason;
+// negative/degradation must use llm_judge|regex (contains-only/exact forbidden).
+export function checkExpectModeKindSafe(cap) {
+  const cases = readTestCases(cap);
+  for (const c of cases) {
+    const q = c.quadrant;
+    if (!q) continue;
+    if (q === 'positive' && c.expect === 'exact' && !c.allow_exact_reason) {
+      return { name: 'expect_mode_kind_safe', status: 'fail', detail: `expect_mode_kind_safe: ${c.file} positive+exact requires allow_exact_reason (R28)` };
+    }
+    if ((q === 'negative' || q === 'degradation') && !['llm_judge', 'regex'].includes(c.expect)) {
+      return { name: 'expect_mode_kind_safe', status: 'fail', detail: `expect_mode_kind_safe: ${c.file} ${q} expect must be llm_judge|regex, got "${c.expect}"` };
+    }
+  }
+  return { name: 'expect_mode_kind_safe', status: 'pass', detail: '' };
+}
+
+// R31 distill_log_verifiable (staged+; methodology §8 F4). Verifies each "来自实录步骤N"
+// log entry against interview.md ## 流程实录 ### 步骤N (preferred) OR body ## 运行流程
+// (fallback). Hallucinated step reference or zero keyword overlap → fail. n/a when no
+// ## 蒸馏日志 section or no step-referenced entries.
+function parseStepBlocks(sec) {
+  const out = {};
+  if (!sec) return out;
+  const lines = sec.split(/\r?\n/);
+  let curN = null;
+  let cur = [];
+  const flush = () => { if (curN !== null) out[curN] = cur.join('\n'); };
+  for (const line of lines) {
+    const m = line.match(/^###\s*步骤\s*(\d+)/);
+    if (m) {
+      flush();
+      curN = m[1];
+      cur = [line]; // include the heading line — its semantic label is the overlap target
+    } else if (curN !== null) {
+      // stop at next H3 not matching 步骤, or H2
+      if (/^##\s/.test(line)) { flush(); curN = null; cur = []; }
+      else cur.push(line);
+    }
+  }
+  flush();
+  return out;
+}
+function tokenizeSet(text) {
+  const cjk = (text.match(/[一-鿿]/g) || []);
+  const en = (text.match(/[a-zA-Z]{2,}/g) || []).map((w) => w.toLowerCase());
+  return new Set([...cjk, ...en]);
+}
+function distillOverlap(logLine, stepText) {
+  // Strip the structural "来自实录步骤N" / "step N" phrase from the log line so the
+  // trivial 步骤 overlap (which appears in both the log phrase and the step heading)
+  // does not fake a pass. The remaining descriptive tokens must overlap the step.
+  const desc = logLine.replace(/来自实录步骤\s*\d+/g, '').replace(/step\s*\d+/gi, '');
+  // Also strip the structural "### 步骤N" heading (and any stray 步骤N) from the step
+  // text. parseStepBlocks includes the heading line in stepText; without this strip,
+  // the heading's literal 步/骤 chars would overlap a log line that only shares that
+  // structural word — a hallucinated reference would fake a pass (R31 loophole).
+  const stepClean = stepText.replace(/^###[ 	]*步骤[ 	]*[0-9]+/m, '').replace(/步骤[ 	]*[0-9]+/g, '');
+  const a = tokenizeSet(desc), b = tokenizeSet(stepClean);
+  const cjkOverlap = [...a].filter((t) => /^[一-鿿]$/.test(t) && b.has(t)).length;
+  const enOverlap = [...a].filter((t) => /^[a-z]{2,}$/.test(t) && b.has(t)).length;
+  return (cjkOverlap >= 2 || enOverlap >= 2);
+}
+export function checkDistillLogVerifiable(cap) {
+  const y = cap.yaml;
+  if (!y) return { name: 'distill_log_verifiable', status: 'pass', detail: '' };
+  if (!['agent', 'skill', 'mcp'].includes(y.kind)) return { name: 'distill_log_verifiable', status: 'n/a', detail: '' };
+  const body = readBodyMarkdown(cap);
+  const logSec = extractH2Section(body, '蒸馏日志');
+  if (!logSec) return { name: 'distill_log_verifiable', status: 'n/a', detail: '' };
+  // resolve step source: interview.md (preferred) → body ## 运行流程 (fallback)
+  const interviewPath = path.join(cap.dir, 'interview.md');
+  let procSteps = {};
+  if (fs.existsSync(interviewPath)) {
+    procSteps = parseStepBlocks(extractH2Section(readText(interviewPath), '流程实录'));
+  } else {
+    procSteps = parseStepBlocks(extractH2Section(body, '运行流程'));
+  }
+  let verifiedAny = false;
+  for (const line of logSec.split(/\r?\n/)) {
+    const m = line.match(/来自实录步骤\s*(\d+)|step\s*(\d+)/i);
+    if (!m) continue;
+    const n = m[1] || m[2];
+    verifiedAny = true;
+    const stepText = procSteps[n];
+    if (stepText === undefined) {
+      return { name: 'distill_log_verifiable', status: 'fail', detail: `distill_log_verifiable: log references step ${n} not found in interview/流程实录` };
+    }
+    if (!distillOverlap(line, stepText)) {
+      return { name: 'distill_log_verifiable', status: 'fail', detail: `distill_log_verifiable: log step ${n} zero keyword overlap with step content` };
+    }
+  }
+  if (!verifiedAny) return { name: 'distill_log_verifiable', status: 'n/a', detail: '' };
+  return { name: 'distill_log_verifiable', status: 'pass', detail: '' };
+}
+
 // R20 description_body_alignment
 export function checkDescriptionBodyAlignment(cap) {
   const y = cap.yaml;
@@ -740,6 +1027,11 @@ export function checkWorkflowRef(cap, allCaps) {
     if (!ids.has(step.capability)) {
       return { name: 'workflow_ref', status: 'fail', detail: `workflow_ref: step "${step.id}" capability "${step.capability}" not resolvable in repo` };
     }
+    // R30 workflow_step_refs_graduated: referenced cap must be staged+ (draft → fail).
+    const refCap = allCaps.find((c) => c.yaml && c.yaml.id === step.capability);
+    if (refCap && refCap.state && refCap.state !== 'staged' && refCap.state !== 'released') {
+      return { name: 'workflow_ref', status: 'fail', detail: `workflow_ref: step "${step.id}" capability "${step.capability}" references non-graduated cap (state=${refCap.state})` };
+    }
   }
   // outputs names align with vars declarations
   if (y.vars && Array.isArray(y.vars)) {
@@ -802,6 +1094,25 @@ export function checkOpsforgeState(cap) {
     }
     if (!Array.isArray(state.history)) {
       return { name: 'opsforge_state', status: 'fail', detail: 'opsforge_state: history must be an array' };
+    }
+    // methodology §7.2: phase enum (interview_done/distill_done/v0.1_built/
+    // iteration_converged/iteration_capped) — orthogonal to state, optional.
+    const VALID_PHASES = ['interview_done', 'distill_done', 'v0.1_built', 'iteration_converged', 'iteration_capped'];
+    if (state.phase !== undefined && state.phase !== null) {
+      if (!VALID_PHASES.includes(state.phase)) {
+        return { name: 'opsforge_state', status: 'fail', detail: `opsforge_state: invalid phase "${state.phase}"` };
+      }
+    }
+    if (state.built_with_model !== undefined && state.built_with_model !== null) {
+      const b = state.built_with_model;
+      if (typeof b !== 'object' || Array.isArray(b) || typeof b.endpoint !== 'string' || typeof b.version !== 'string') {
+        return { name: 'opsforge_state', status: 'fail', detail: 'opsforge_state: built_with_model must be {endpoint:string, version:string}' };
+      }
+    }
+    if (state.built_at !== undefined && state.built_at !== null) {
+      if (typeof state.built_at !== 'string' || isNaN(Date.parse(state.built_at))) {
+        return { name: 'opsforge_state', status: 'fail', detail: 'opsforge_state: built_at must be an ISO string' };
+      }
     }
     for (const h of state.history) {
       // D4: `from` may be null (start transition) but must be PRESENT (not undefined).
@@ -921,6 +1232,14 @@ export function validateDir(dir, opts = {}) {
   checks.push(checkPreGatesNontrivial(cap));
   checks.push(checkTestCasesDistinct(cap));
   checks.push(checkTurnsWellFormed(cap));
+  // methodology §8 R24–R28 + R31 (staged+ siblings of R23; R30 inside checkWorkflowRef).
+  checks.push(checkProcessStagesPresent(cap));
+  checks.push(checkDegradationPresent(cap));
+  checks.push(checkDependsDeclared(cap));
+  checks.push(checkTestFourQuadrants(cap));
+  checks.push(checkRunInstructionPresent(cap));
+  checks.push(checkExpectModeKindSafe(cap));
+  checks.push(checkDistillLogVerifiable(cap));
   checks.push(checkDescriptionBodyAlignment(cap));
   checks.push(checkTestExpectDeclared(cap));
   checks.push(checkNoSelfCheatInBody(cap));
@@ -936,7 +1255,9 @@ export function validateDir(dir, opts = {}) {
   const platformConf = checkPlatformConformance(cap);
   if (platformConf) checks.push(platformConf);
 
-  const verdict = checks.every((c) => c.status === 'pass' || c.status === 'n/a') ? 'pass' : 'fail';
+  // R26 soft-check introduces `warn` status — warn does NOT fail the verdict
+  // (R16–R22 unchanged; only R26 may emit warn). This is a minimal extension.
+  const verdict = checks.every((c) => c.status === 'pass' || c.status === 'n/a' || c.status === 'warn') ? 'pass' : 'fail';
   return { verdict, checks, dir };
 }
 
@@ -1127,7 +1448,7 @@ export async function main() {
     verdict = res.verdict;
     await writeReport(target, res); // P0-5: write validation-report.json (D1: real rc)
     for (const c of res.checks) {
-      const tag = c.status === 'pass' ? 'PASS' : 'FAIL';
+      const tag = c.status === 'pass' ? 'PASS' : c.status === 'warn' ? 'WARN' : c.status === 'n/a' ? 'N/A' : 'FAIL';
       console.log(`${tag}  ${c.name}${c.detail ? '  ' + c.detail : ''}`);
     }
     console.log(`\nverdict: ${verdict}`);

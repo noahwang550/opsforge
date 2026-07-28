@@ -94,7 +94,8 @@ function makeCap({ tmp, state = 'staged', kind = 'agent', slug = 'foo', name = '
     // R_scenario: body must carry "## 能力说明" + "## 适用场景" H2 sections (staged+).
     const bodyNoun = FILL; // description is "filled"; body must contain "filled"
     const substance = `This is a ${bodyNoun} capability body for testing purposes. It performs operations including content creation, review, and reporting. The agent processes input data and generates output based on configured rules and templates. Quality assurance checks are performed on all generated content before delivery. Additional context and instructions are provided here to ensure the body meets minimum substance thresholds for the OpsForge validation gate. This section covers the primary workflow steps, input handling, output format, error handling, and edge case management. The capability supports multiple input formats and produces structured output suitable for downstream processing. Configuration parameters allow customization of behavior per project requirements. Logging and monitoring hooks are integrated for observability. The implementation follows best practices for maintainability and extensibility. Documentation references are included for each function. Performance considerations are addressed through lazy loading and caching strategies. The module exposes a clean public interface with comprehensive type annotations. Thread safety is ensured through immutable data structures wherever possible. Test coverage requirements dictate thorough validation of all code paths including error branches and boundary conditions.`;
-    const body = `## 能力说明\n\n${substance}\n\n## 适用场景\n\n- content creation and copywriting\n- review and reporting\n- performance analysis`;
+    const runInstr = `You are a test capability. When invoked, receive the input data from the configured source path without pasting raw values, validate it against the schema, aggregate the performance indicators, decide the output format based on the configured rules, generate the structured report with key findings trends and recommendations, identify outliers and notable patterns, and present the results in a clear format suitable for stakeholders. Support multiple report formats including executive summaries and detailed breakdowns. Handle edge cases and boundary conditions gracefully with degradation. Never fabricate data; when a data source is unavailable, degrade to an empty report with an alert rather than crashing. All generated content passes a quality checkpoint before delivery. Maintain consistency across invocations and reuse style memory where applicable.`;
+    const body = `## 能力说明\n\n${substance}\n\n## 适用场景\n\n- content creation and copywriting\n- review and reporting\n- performance analysis\n## 运行流程\n\n### 步骤1 接收数据\n数据:输入文件路径\n决策:校验通过\n交付工件:解析结果\n\n### 步骤2 生成输出\n数据:聚合指标\n决策:格式选择\n交付工件:最终报告\n\n## 失败降级\n\n- 数据源不可用时降级返回空报告并告警\n\n## 角色设定\n\n测试角色，处理输入并生成输出，不越权写入\n\n## 工具面\n\n- query-metrics\n\n## 数据契约\n\n- input: metric string; output: JSON {metric, value}\n\n## 异常处理\n\n- 网络错误重试退避；鉴权失败 fail loud\n\n## 边界\n\n- 不越权写入投放系统；不杜撰数据指标\n\n## 依赖\n\n- 无\n\n## 运行指令\n\n${runInstr}\n\n## 蒸馏日志\n\n- 接收数据来自实录步骤1\n- 生成输出来自实录步骤2`;
     const entrypoint = kind === 'skill' ? 'SKILL.md' : 'source.md';
     const epPath = path.join(dest, entrypoint);
     if (fs.existsSync(epPath)) {
@@ -105,25 +106,39 @@ function makeCap({ tmp, state = 'staged', kind = 'agent', slug = 'foo', name = '
         fs.writeFileSync(epPath, raw);
       }
     }
-    // R19 test_cases_distinct: make each case unique.
+    // mcp R24: tools: array must be non-empty — inject a tool for the test fixture.
+    if (kind === 'mcp') {
+      const mcpPath = path.join(dest, 'source.md');
+      if (fs.existsSync(mcpPath)) {
+        let s = fs.readFileSync(mcpPath, 'utf8');
+        if (/^tools:\s*\[\]\s*$/m.test(s)) {
+          s = s.replace(/^tools:\s*\[\]\s*$/m, 'tools:\n  - name: query-metrics\n    description: Query metrics\n');
+          fs.writeFileSync(mcpPath, s);
+        }
+      }
+    }
+    // R19/R26/R28: rewrite test cases with valid quadrant/source/confidence + expect modes.
     const testsDir = path.join(dest, 'tests');
     if (fs.existsSync(testsDir)) {
       const caseFiles = fs.readdirSync(testsDir).filter((f) => f.endsWith('.yaml')).sort();
+      const QUADS = [
+        { q: 'positive', exp: 'contains', rubric: null },
+        { q: 'boundary', exp: 'contains', rubric: null },
+        { q: 'negative', exp: 'llm_judge', rubric: 'a'.repeat(25) },
+      ];
       caseFiles.forEach((f, i) => {
-        const p = path.join(testsDir, f);
-        let s = fs.readFileSync(p, 'utf8');
-        s = s.replace(/input: filled/, `input: case-input-${i}`);
-        s = s.replace(/expected: filled/, `expected: case-expected-${i}`);
-        fs.writeFileSync(p, s);
+        const qd = QUADS[i % 3];
+        const yamlStr = `name: case-${i}\ninput: case-input-${i}\nexpect: ${qd.exp}\nexpected: case-expected-${i}\nschema_ref: null\njudge_rubric: ${qd.rubric ? JSON.stringify(qd.rubric) : 'null'}\njudge_threshold: 0.7\nweight: 1.0\nquadrant: ${qd.q}\nsource: recalled\nconfidence: med\nallow_exact_reason: null\nref: null\n`;
+        fs.writeFileSync(path.join(testsDir, f), yamlStr);
       });
     }
-    // R_wf_ref: workflow step.capability must be resolvable — set to own id.
+    // R_wf_ref: workflow step.capability must be resolvable — set ALL to own id.
     if (kind === 'workflow') {
       const wfPath = path.join(dest, 'workflow.yaml');
       if (fs.existsSync(wfPath)) {
         let s = fs.readFileSync(wfPath, 'utf8');
         const ownId = `${brand || slug}.${name}`;
-        s = s.replace(/capability: filled/, `capability: ${ownId}`);
+        s = s.split('capability: filled').join(`capability: ${ownId}`);
         fs.writeFileSync(wfPath, s);
       }
     }

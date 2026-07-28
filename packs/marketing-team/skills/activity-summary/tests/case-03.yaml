@@ -1,4 +1,14 @@
 name: case-003
 input:
   period: quarterly
-expect: human
+  data_source: unavailable
+expect: llm_judge
+expected: 数据源不可用时应降级返回空报告并告警，不崩
+judge_rubric: 评分 0-1，是否在数据源不可用时正确降级（返回空报告+告警）而非崩溃。满分要求明确降级处理。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

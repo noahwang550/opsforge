@@ -1,5 +1,14 @@
-name: discover-from-manifest
+name: discover-corrupt-manifest-no-crash
 input:
   action: discover
-expect: exact
-expected: 读 per-project manifest 渲染质量灯与商用标签
+  manifest: corrupt-json
+expect: llm_judge
+expected: 不应崩溃，应给出 manifest 解析失败提示
+judge_rubric: 评分 0-1，是否正确处理 manifest 解析失败而不崩溃，应给出中文错误提示。满分要求不崩溃且提示明确。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

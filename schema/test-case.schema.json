@@ -77,6 +77,24 @@
           }
         }
       }
+    },
+    "quadrant": {
+      "type": "string",
+      "enum": ["positive", "boundary", "negative", "degradation"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["real", "recalled", "synthetic", "llm_drafted_confirmed"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "med", "low"]
+    },
+    "allow_exact_reason": {
+      "type": ["string", "null"]
+    },
+    "ref": {
+      "type": ["string", "null"]
     }
   }
 }

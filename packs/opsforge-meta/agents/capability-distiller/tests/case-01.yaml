@@ -1,0 +1,12 @@
+name: shape-inference-skill
+input:
+  record: 两三步一环扣一环，无分叉
+expect: contains
+expected:
+  - skill
+  - 形状推导
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

@@ -464,32 +464,84 @@ export async function doctor(args) {
     }
   }
 
-  // Phase 3.2: effectiveness scan — last N=20 ratings; <70% pass → degraded.
-  const eff = effectivenessScan(opsforgeHome);
+  // Phase 3.2 / methodology §5.4: effectiveness scan — last N=20 ratings; <70% pass →
+  // degraded. J.2 fix: read per-cap `kb/<pack>/feedback/<cap-id>.jsonl` (what cmdFeedback
+  // writes) AND legacy `feedback/ratings.jsonl` (MCP /rate), aggregate by capId. Tier
+  // split: Tier 1 caps → main denominator; Tier 2/3 excluded from main denominator.
+  const tierOf = (capId) => {
+    for (const cap of manifest.capabilities) {
+      if (cap.id === capId && cap.platform) {
+        if (cap.platform === platform) return adapter.tier();
+        return 1; // cross-platform cap → conservative Tier 1 (main denominator)
+      }
+    }
+    return 1; // unknown cap → main denominator (conservative)
+  };
+  const eff = effectivenessScan(opsforgeHome, { tierOf });
   if (eff.degraded) {
-    issues.push({ severity: 'medium', check: 'effectiveness_degraded', detail: `Effectiveness ${eff.passRate}% over last ${eff.count} ratings (<70%)`, fix: 'Re-evaluate affected capabilities and consider a downgrade or revision' });
+    issues.push({ severity: 'medium', check: 'effectiveness_degraded', detail: `Effectiveness ${eff.passRate}% over last ${eff.count} ratings (<70%)${eff.tier23 && eff.tier23.length ? ` (Tier2/3 excluded: ${eff.tier23.join(', ')})` : ''}`, fix: 'Re-evaluate affected capabilities and consider a downgrade or revision' });
   }
 
   return { healthy: issues.length === 0, issues };
 }
 
-/** Phase 3.2: scan the last N=20 feedback ratings; <70% pass → degraded. */
-function effectivenessScan(opsforgeHome, N = 20) {
+/**
+ * methodology §5.4 effectivenessScan: aggregate feedback from per-cap jsonl
+ * (kb/<pack>/feedback/<cap-id>.jsonl, written by cmdFeedback) + legacy ratings.jsonl
+ * (MCP /rate). Tier 1 caps → main denominator (last N=20, <70% → degraded); Tier 2/3
+ * excluded from main denominator (reported in tier23[], never degraded).
+ * @param {string} opsforgeHome
+ * @param {{tierOf?: (capId:string)=>1|2|3, N?: number}} opts
+ */
+export function effectivenessScan(opsforgeHome, opts = {}) {
   const home = opsforgeHome || resolveOpsforgeHome();
-  const p = path.join(home, 'feedback', 'ratings.jsonl');
-  if (!fs.existsSync(p)) return { degraded: false, count: 0, passRate: 100 };
-  let lines;
-  try { lines = fs.readFileSync(p, 'utf8').trim().split(/\r?\n/).filter(Boolean); }
-  catch { return { degraded: false, count: 0, passRate: 100 }; }
-  const last = lines.slice(-N);
-  if (last.length === 0) return { degraded: false, count: 0, passRate: 100 };
+  const N = opts.N || 20;
+  const tierOf = opts.tierOf || (() => 1);
+  const byCap = new Map();
+  const ingest = (filePath) => {
+    if (!fs.existsSync(filePath)) return;
+    let lines;
+    try { lines = fs.readFileSync(filePath, 'utf8').trim().split(/\r?\n/).filter(Boolean); }
+    catch { return; }
+    for (const l of lines) {
+      let r;
+      try { r = JSON.parse(l); } catch { continue; }
+      if (!r || r.cap_id === undefined) continue;
+      const capId = r.cap_id;
+      if (!byCap.has(capId)) byCap.set(capId, []);
+      byCap.get(capId).push(r);
+    }
+  };
+  // 1. per-cap jsonl under kb/<pack>/feedback/<cap-id>.jsonl (cmdFeedback source)
+  const kbDir = path.join(home, 'kb');
+  if (fs.existsSync(kbDir)) {
+    for (const pack of fs.readdirSync(kbDir, { withFileTypes: true })) {
+      if (!pack.isDirectory()) continue;
+      const fbDir = path.join(kbDir, pack.name, 'feedback');
+      if (!fs.existsSync(fbDir)) continue;
+      for (const f of fs.readdirSync(fbDir).filter((f) => f.endsWith('.jsonl'))) {
+        ingest(path.join(fbDir, f));
+      }
+    }
+  }
+  // 2. legacy ratings.jsonl (MCP /rate source) — keeps backward compat.
+  ingest(path.join(home, 'feedback', 'ratings.jsonl'));
+  // Tier split
+  const tier1 = [];
+  const tier23 = [];
+  for (const [capId, ratings] of byCap) {
+    const t = tierOf(capId);
+    if (t === 1) tier1.push(...ratings);
+    else tier23.push(capId);
+  }
+  const last = tier1.slice(-N);
+  if (last.length === 0) return { degraded: false, count: 0, passRate: 100, tier23 };
   let pass = 0;
-  for (const l of last) {
-    try { const r = JSON.parse(l); if (r.rating === 'up' || r.rating === 'pass' || r.rating >= 0.7) pass++; }
-    catch { /* skip */ }
+  for (const r of last) {
+    if (r.rating === 'up' || r.rating === 'pass' || (typeof r.rating === 'number' && r.rating >= 0.7)) pass++;
   }
   const passRate = Math.round((pass / last.length) * 100);
-  return { degraded: passRate < 70, count: last.length, passRate };
+  return { degraded: passRate < 70, count: last.length, passRate, tier23 };
 }
 
 /**

@@ -1,5 +1,13 @@
-name: invalid-choice-reprompt
+name: invalid-choice-reject
 input:
   choice: "9"
-expect: contains
-expected: 没看懂这个选项
+expect: llm_judge
+expected: 应拒绝非法选项并提示重新输入
+judge_rubric: 评分 0-1，是否正确拒绝非法菜单选项（如 9）并重新提示，不执行任何动作。满分要求明确提示"没看懂这个选项"。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

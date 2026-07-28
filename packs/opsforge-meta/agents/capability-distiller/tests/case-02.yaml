@@ -1,0 +1,13 @@
+name: distill-log-mechanical-verify
+input:
+  log: 形状推导来自实录步骤1
+  step1: 存在且内容重叠
+expect: contains
+expected:
+  - 蒸馏日志
+  - 步骤
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

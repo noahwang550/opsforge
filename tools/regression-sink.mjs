@@ -95,6 +95,9 @@ export function generateCase(feedback, failure, opts) {
     judge_rubric: '__FILL_ME__',
     judge_threshold: 0.7,
     weight: 1.0,
+    // methodology P1-8: regression drafts carry a quadrant placeholder; distiller
+    // overwrites it during iteration (R7 blocks __FILL_ME__ at staged+).
+    quadrant: '__FILL_ME__',
   };
   const testsDir = path.join(opts.draftsDir, 'tests');
   fs.mkdirSync(testsDir, { recursive: true });

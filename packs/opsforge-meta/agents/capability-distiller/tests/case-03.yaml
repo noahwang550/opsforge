@@ -1,0 +1,14 @@
+name: behavior-gap-no-fabrication
+input:
+  record: 实录只覆盖正常情况
+  missing: 上游挂该兜底
+expect: llm_judge
+expected: 应抛行为缺口回访谈，不编造处理方式
+judge_rubric: 评分 0-1，是否正确拒绝为未覆盖象限编造处理方式，应抛行为缺口回访谈补样本。满分要求明确标注缺口并回访谈。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

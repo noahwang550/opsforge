@@ -1,5 +1,14 @@
-name: registry-priority
+name: registry-missing-fail-loud
 input:
   action: readRegistry
-expect: exact
-expected: 仓库 registry 优先于 home 副本
+  state: 仓库无 registry 且 home 副本缺失
+expect: llm_judge
+expected: 应 fail loud 提示 registry 缺失，不静默
+judge_rubric: 评分 0-1，是否在 registry 仓库与 home 副本均缺失时正确 fail loud 而非静默通过。满分要求明确中文报错。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

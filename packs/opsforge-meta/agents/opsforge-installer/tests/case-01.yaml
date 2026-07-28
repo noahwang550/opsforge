@@ -3,3 +3,8 @@ input:
   action: bootstrap twice
 expect: contains
 expected: 第二次 bootstrap 跳过未变更文件
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

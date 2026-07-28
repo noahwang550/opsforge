@@ -1,7 +1,7 @@
 # OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合)
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
-> **Last Updated:** 2026-07-27
+> **Last Updated:** 2026-07-28
 > Authoritative sources: `PLAN.md` (v9 spec, §6/§7/§8/§13/§A/§B/§C/§14/§20/§21/§22), `docs/design-archive/supplement-v7.md` / `supplement-v8.md` / `supplement-v9.md`, `ARCHITECTURE-DELTA.md` (Phase 1 contracts), `IMPLEMENTATION-PLAN.md` (sub-phase build order), `DESIGN.md` (Phase 0 blueprint + Phase 1 additions). This file records *what was actually built* vs those specs.
 
 ## Phase 0 — COMPLETE
@@ -336,6 +336,92 @@ Distilled from review/fix-pass。每条：现象 → Why it matters → How to a
 - **现象：** skill-up 的 Go CLI 与 pinned baseline §C.1（Node 22 ESM `.mjs`，唯一 sh 例外是 `install.sh`）硬冲突；内化思想为 Node 实现保留全部治理严格度，零新依赖。
 - **Why：** 引 Go 二进制会破 §C.1 pinned baseline + 增加贡献者环境复杂度 + 绕过 OpsForge 自身 gate（Go 代码不被 validate/security-scan/eval 覆盖）。
 - **How to apply：** 外部工具的思想可内化（Node 实现），但二进制本身不进仓库；保持 pinned baseline 单一语言栈是首要不变量。
+
+## Phase 4 第二刀 — capability-creation 方法论（SHIPPED 2026-07-28）
+
+把"建好一个能力"从"往空模板填字"升级为"LLM 引导式沉淀 + 作者审稿"（propose_and_confirm）。蓝本 `docs/design-archive/capability-creation-methodology.md`（FINAL v1）+ `capability-creation-methodology-impl-plan.md`，由 5-agent 流水线（architect → tdd-guide → e2e-runner → code-simplifier → code-reviewer）全量交付。bare `node --test` 424 → **489**（+57 方法论实现 + +8 review 修复，0 fail）；6 gates 全绿（10 capabilities：4 marketing-team + 6 opsforge-meta）。零新 npm 依赖；所有新文件是 steering-owned ESM `.mjs` + `.md`/`.yaml`/`.json`；`additionalProperties:false` 全保留；`registry*.yaml` auto-gen 不动；R16–R22 不弱化 + R24–R31 同级新增。
+
+### 实际交付
+
+1. **访谈→蒸馏→跑通 流水线**：`@capability-interviewer`（agent）+ `@capability-distiller`（agent）+ `opsforge-interview`（纯 prompt skill，Tier 2/3 任意 LLM 可跑）。访谈反锚定守卫（先复述再出草稿，草稿对不上复述标 `synthetic` 不标 `real`）；蒸馏形状推导（附 C12 业务语言例对，作者按场景匹配确认 kind）；跑通门 ≥2 case（1 positive contains + 1 boundary/negative llm_judge，最便宜 endpoint）。
+2. **Schema 扩 5 字段**：`schema/test-case.schema.json` +`quadrant`/`source`/`confidence`/`allow_exact_reason`/`ref`（全 optional，`additionalProperties:false` 保留）。
+3. **R-rules（staged+ 同级新增，draft gate 不动）**：R24/R24b（process_stages + degradation 软/硬）、R25（depends_on 声明）、R26（四象限正例 source∈{real,recalled+med}，软 warn）、R27（运行指令章节）、R28（expect 模式约束：positive 禁 exact 除非带 reason；negative/degradation 强制 llm_judge/regex）、R29（interview real 样本可验证 ref）、R30（workflow step.capability 引用 staged+ 能力，graduated refs）、R31（distill-log token-overlap 校验，剥离 `步骤N` 结构词防虚假通过）。verdict 接受 `warn`（R26 软 only，R16–R22 不弱化）。R29 在 `new-capability.mjs promote()/promoteCase()`。
+4. **State/CLI**：`writeOpsforgeState` 导出 phase/built_with_model/built_at opts；新 `opsforge set-phase <capDir> <phase>` 子命令（纯 argv，Windows-safe）。
+5. **Tools**：test-runner 剥 frontmatter + 解析 stream-json usage；report-renderer `renderRunLight` 两档 🟢/🔵/🔴 + cheapest-smoke 文案 + recalled+med "未硬验证"；install.mjs `effectivenessScan` per-cap jsonl + Tier 分档；regression-sink `generateCase` 加 `quadrant: __FILL_ME__`；evolve 被动触发在 cmdDiscover/cmdDoctor（feedback≤2 或第 3 次调用自动提示）。
+6. **promote**：`new-capability.mjs --promote-case <srcDir> <caseFile>`（positional，BUG-1 修复）+ `--src`/`--file` named fallback；R29 + 良构 + run-pass 两道门。parseArgs 加 `BOOLEAN_FLAGS` set 防位置参数被吞为 flag value。
+7. **2 新 agents + 1 新 skill** under `packs/opsforge-meta/`：`capability-interviewer`、`capability-distiller`、`opsforge-interview`（纯 prompt）。全 pass R1–R31 + security-scan + release。
+8. **Templates**：`templates/interview-record.md`（新）；`templates/{skill,agent,mcp}/` body H2 增补（`## 运行流程`/`## 运行指令`/`## 角色设定`/`## 工具集`/`## 工具面`/`## 数据契约` 等）；`tests/case-01..03.yaml` quadrant/source/ref 默认。
+9. **Dogfood backfill**：`packs/marketing-team/` activity-summary/copywriter/bi-connector + campaign-retrospect — body H2 + tests quadrant/source + case-01 expect exact→contains/schema/llm_judge。
+10. **Contributor doc**：`docs/methodology/capability-creation.md`（5 期 + C12 业务语言表 + 平台诚实分层 + source/ref 规则 + 升级门票三态）。
+
+### 新增/扩展文件（实际）
+
+- 新增 `.mjs` 测试（共 16 个）：`tools/effectiveness-tier-split.test.mjs`、`tools/promote-case.test.mjs`、`tools/regression-sink-quadrant.test.mjs`、`tools/render-run-light.test.mjs`、`tools/set-phase-split.test.mjs`、`tools/set-phase.test.mjs`、`tools/validate-r24-process-stages.test.mjs`、`tools/validate-r24b-degradation.test.mjs`、`tools/validate-r25-depends-declared.test.mjs`、`tools/validate-r26-four-quadrants.test.mjs`、`tools/validate-r26-render.test.mjs`、`tools/validate-r27-run-instruction.test.mjs`、`tools/validate-r28-expect-mode.test.mjs`、`tools/validate-r29-interview-real-sample.test.mjs`、`tools/validate-r30-workflow-graduated.test.mjs`、`tools/validate-r31-distill-log.test.mjs` + `tools/report-templates/run-light.zh.md`。
+- 新增能力：`packs/opsforge-meta/agents/capability-interviewer/`、`packs/opsforge-meta/agents/capability-distiller/`、`packs/opsforge-meta/skills/opsforge-interview/`（各含 `.opsforge-state.json`/`source.md`/`SKILL.md`/`tests/`/reports）。
+- 改：`schema/test-case.schema.json`（+5 optional 字段）、`tools/validate.mjs`（R24–R31 + verdict warn + SKELETON_GUARD_EXCLUSIONS 加 interview.md 双指针）、`tools/new-capability.mjs`（promote-case + R29 + BOOLEAN_FLAGS）、`tools/test-runner.mjs`（剥 frontmatter + stream-json）、`tools/report-renderer.mjs`（renderRunLight 两档）、`install.mjs`（effectivenessScan per-cap jsonl + Tier 分档）、`tools/regression-sink.mjs`（generateCase + quadrant）、`tools/opsforge.mjs`（set-phase 子命令 + evolve 被动触发）、`templates/{skill,agent,mcp}/`（body H2 + tests 默认）、`templates/interview-record.md`（新）、`docs/methodology/capability-creation.md`（新）。marketing-team 4 caps + opsforge-meta 3 caps dogfood backfill。
+- 设计文档：`docs/design-archive/capability-creation-methodology.md`（FINAL v1 spec）+ `capability-creation-methodology-v2.md` + `capability-creation-methodology-impl-plan.md`。
+
+### 关键不变量（全守住）
+
+- 不引新 npm 依赖（`package.json` deps 仍 `ajv`/`js-yaml`/`semver`）。
+- `additionalProperties:false` 全保留（test-case schema 扩 5 字段全 optional）。
+- `registry*.yaml` auto-gen 不动（`release.mjs` 三报告 gate 逻辑不变）。
+- 贡献者只写 `.md/.yaml/.json`；回归草稿必经 `--promote-case`（留 `__FILL_ME__`，R7/R29 挡）。
+- Windows 兼容；R16–R22 不弱化 + R24–R31 同级新增；release gate 三报告逻辑不动；R26 软 warn 不破硬 gate。
+- 工作流 v0.1 gates 不变（a 结构 + c R30 graduated refs + e HITL 签字）；v0.2 checkpoint 决策注入/condition evaluator/vars schema 独立 PR 不阻塞。
+
+### Final test & validation status (Phase 4 capability-creation 方法论)
+
+- **Tests:** **489/489 green** via bare `node --test` (0 fail, 0 cancelled, 0 skipped). Phase 4 skill-up 基线 424 + **57 方法论实现 + 8 review 修复**。新 cases：R24/R24b/R25/R26/R27/R28/R29/R30/R31 各级 + effectiveness Tier 分档 + set-phase + promote-case + render-run-light + regression-sink-quadrant。
+- **`validate.mjs --all`:** exit 0, `verdict: pass (10 capability(ies))`（R24–R31 同级新增生效，warn 软 only）。
+- **`security-scan.mjs --all`:** exit 0, 0 findings。
+- **`eval.mjs --all`:** exit 0, 10 caps verdict `pending` at overall=0.3（无 live-model run；harness wired，非阻塞）。
+- **`release.mjs --all`:** exit 0, registry 10 capabilities（三报告 gate 不变）。
+- **`install.mjs --doctor --platform claude-code`:** `healthy: true`, exit 0。
+- **Zero residual:** code-reviewer + code-simplifier 闭环所有发现（含 parseArgs 吞位置参数、effectivenessScan 数据源断链、R31 token-overlap 漏洞、`__FILL_ME__`→`filled` 破 enum、R26 warn 渲染为 FAIL 等）。
+
+### Deferred（不阻塞，独立 PR）
+
+- **workflow-runner v0.2**：checkpoint 决策注入 + condition evaluator + vars schema。v0.1 gates (a) 结构 + (c) R30 graduated refs + (e) HITL 签字 intact；per 蓝本 §J.11 独立 PR。
+
+## Lessons learned (Phase 4 capability-creation 方法论)
+
+Distilled from architect→tdd→e2e→simplifier→reviewer pipeline。每条：现象 → Why → How to apply。
+
+### s. SKELETON_GUARD_EXCLUSIONS 有两处副本
+- **现象：** `interview.md` 的豁免同时活在 `new-capability.mjs`（scaffold 时排除）和 `validate.mjs`（校验时排除）两处常量；设计文档只点名了一处。只改一处会让 `validate --all` 把 interview.md 标为 `extra`。
+- **Why：** 模板骨架签名有两消费者（scaffold 复制 + validate 校验），任一消费者漏掉豁免就破对称。
+- **How to apply：** 加新豁免文件时同步改两处 `SKELETON_GUARD_EXCLUSIONS`，并加双指针注释互相引用。相关 [[skeleton-guard-exclusions-two-places]]。
+
+### t. parseArgs 把位置参数吞为 flag value
+- **现象：** `--promote-case <srcDir>` 文档约定位置形式，但 `parseArgs` 把 srcDir 当成 `--promote-case` 的 string value 吞掉，CLI 路径挂；函数级测试绿但 CLI argv 路径未覆盖。
+- **Why：** boolean flag 与 string-flag 混解析时，位置参数被误当 flag 值；函数级测试不触达 argv 解析。
+- **How to apply：** 文档约定的 CLI 形式必须有 CLI-spawn 测试覆盖，不只测函数 API；parseArgs 需显式 `BOOLEAN_FLAGS` set 分离 positional 与 flag。相关 [[test-cli-argv-path-not-just-function]]。
+
+### u. 数据源断链（effectivenessScan vs cmdFeedback）
+- **现象：** `cmdFeedback` 写 `kb/<pack>/feedback/<cap-id>.jsonl`，但 `effectivenessScan` 读 `feedback/ratings.jsonl`——两者从没接上，Tier 分档无数据源。
+- **Why：** 设计文档假设两函数共享数据源却没核对真实路径；写功能时不读对方实现。
+- **How to apply：** 设计文档凡假设"两函数共享数据源"必须对真实路径核查；写消费端前先 grep 生产端的落盘路径。
+
+### v. R31 token-overlap 的结构词漏洞
+- **现象：** `步骤N` 标题字造成虚假 overlap pass；零依赖"语义相关"启发式很松。
+- **Why：** 结构 token（标题编号）与业务 token 混在一起，overlap 分母被结构词撑高。
+- **How to apply：** 零依赖 overlap 启发式必须先剥结构词（`步骤N`/序号/章节标题）再算；overlap 不是语义相似度，只是兜底防蒸馏日志编造。
+
+### w. R26 warn 状态需渲染路径覆盖
+- **现象：** verdict 加 `warn` 但 `tag` 渲染器没更新，软警告显示成 `FAIL`。
+- **Why：** 新 verdict 状态有独立渲染路径，加逻辑不改渲染就破显示。
+- **How to apply：** 新 verdict 状态必须加 render-path 测试（`validate-r26-render.test.mjs` 模式）。相关 [[validate-new-rule-run-full-tests]]。
+
+### x. `__FILL_ME__`→`filled` 全局替换破 enum
+- **现象：** 模板 `source: __FILL_ME__` 被全局替换成 `source: filled`，非法 enum 值挂 R26。
+- **Why：** placeholder 全局替换不区分 enum 字段与自由文本字段。
+- **How to apply：** scaffold→staged 测试 fixture 必须把 enum 字段改成合法值，不依赖全局 placeholder 填充；placeholder 清理与 enum 赋值是两步。
+
+### y. 文档行号易漂移，引函数名不引行号
+- **现象：** 设计文档引 `promptNew 444-453` 等行号；architect 核查时仍准但脆弱。
+- **Why：** 行号随实现改动漂移，函数名稳定。
+- **How to apply：** 蓝本引用代码位置时引函数名/符号，不引行号；必引行号时附函数名锚定。
 
 ### Final test & validation status (Phase 2 + Phase 3 + Phase 3.6)
 

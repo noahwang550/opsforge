@@ -7,7 +7,7 @@ owner: marketing-team
 display_name: BI Connector
 display_name_zh: BI连接器
 display_name_en: BI Connector
-description: connector mcp that interfaces with business intelligence systems
+description: '【示例能力】connector mcp that interfaces with business intelligence systems'
 platforms:
   - claude-code
 entrypoint: source.md
@@ -31,6 +31,8 @@ source:
 ---
 ## 能力说明
 
+> 【示例能力】本能力为 OpsForge 示范用例（dogfood），非真实业务能力，请勿当作生产能力使用。
+
 BI 连接器 MCP，对接商业智能系统拉取营销指标与表现数据。通过 query-metrics 工具按统一 schema 查询活动表现、人群分析与转化数据；鉴权走环境变量，含速率限制、重试退避与缓存；工具面刻意收敛以防越权，所有输入严格 schema 校验后转发。
 
 ## 适用场景
@@ -39,6 +41,23 @@ BI 连接器 MCP，对接商业智能系统拉取营销指标与表现数据。�
 - 人群画像与转化漏斗分析
 - 自动化报表数据源接入
 - 运营大屏指标拉取
+
+## 工具面
+
+- query-metrics：按统一 schema 查询活动表现/人群/转化数据；工具面刻意收敛防越权
+
+## 数据契约
+
+- 输入：metric 字符串（impressions/clicks/conversions）；输出：JSON {metric, value}
+- 鉴权走环境变量 BI_API_KEY，不硬编码
+
+## 异常处理
+
+- 网络错误重试退避；鉴权失败 fail loud；速率限制触发时降级缓存
+
+## 依赖
+
+- 无
 
 ## 运行指令
 
