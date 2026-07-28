@@ -107,20 +107,27 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 
 > 由 `node tools/inventory.mjs --readme` 从 registry + 能力 body 的 `## 能力说明` / `## 适用场景` 章节派生。草稿不出现。
 
-### 通用能力
+### OpsForge 工具能力
 
 | id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
 |---|---|---|---|---|---|---|
-| `marketing-team.copywriter` | 营销文案写手 | agent | claude-code(T1) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
 | `opsforge-meta.capability-distiller` | 能力蒸馏器 | agent | claude-code(T1) | 访谈期产出的 interview.md 需要转成能力骨架 + 系统提示词草稿 | 已发布 | 1.0.0 |
 | `opsforge-meta.capability-interviewer` | 能力访谈员 | agent | claude-code(T1) | 业务运营同学要把一件重复工作沉淀成能力，但写不出系统提示词 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
-| `marketing-team.activity-summary` | 活动总结 | skill | claude-code(T1) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
-| `marketing-team.bi-connector` | BI连接器 | mcp | claude-code(T1) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
-| `marketing-team.campaign-retrospect` | 活动回顾 | workflow | claude-code(T1) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
+
+### 示例能力（dogfood · 非核心交付）
+
+> 以下能力来自示例包，用于演示业务团队如何用 OpsForge 沉淀工作；业务内容为示意，不应直接当作生产工具。
+
+| id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
+|---|---|---|---|---|---|---|
+| `marketing-team.copywriter` | 营销文案写手 · 示例 | agent | claude-code(T1) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
+| `marketing-team.activity-summary` | 活动总结 · 示例 | skill | claude-code(T1) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
+| `marketing-team.bi-connector` | BI连接器 · 示例 | mcp | claude-code(T1) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
+| `marketing-team.campaign-retrospect` | 活动回顾 · 示例 | workflow | claude-code(T1) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
 
 <!-- opsforge:capability-inventory end -->
 

@@ -56,6 +56,22 @@ function classifyScope(capDir) {
   return { scope: 'general', brand: null };
 }
 
+// 读 pack 清单（packs/<pack>/pack.yaml），缓存。返回 { example: bool }。
+const _packCache = {};
+function loadPackManifest(repoRoot, pack) {
+  if (_packCache[pack] !== undefined) return _packCache[pack];
+  let manifest = { example: false };
+  try {
+    const p = path.join(repoRoot, 'packs', pack, 'pack.yaml');
+    if (fs.existsSync(p)) {
+      const y = yaml.load(fs.readFileSync(p, 'utf8')) || {};
+      manifest = { example: !!y.example };
+    }
+  } catch { /* fresh */ }
+  _packCache[pack] = manifest;
+  return manifest;
+}
+
 // body 文件：agent/skill/mcp 用 entrypoint（含 frontmatter，剥离）；workflow/bundle 用 README.md。
 function bodyFilePath(cap) {
   const y = cap.yaml;
@@ -134,7 +150,7 @@ function qualityLight(cap) {
  * @returns {Promise<{general: Array, brands: Object, all: Array}>}
  *   每个 entry：{id, version, kind, pack, owner, customer, display_name_zh,
  *   display_name_en, description, detail, scenarios, scenarioTag, platformSupport,
- *   light, state, scope, brand, dir}
+ *   light, state, scope, brand, example, dir}
  */
 export async function buildInventory(opts = {}) {
   const repo = opts.repoRoot || getRepoRoot();
@@ -149,6 +165,7 @@ export async function buildInventory(opts = {}) {
     const state = detectCapState(cap.dir, isReleased);
     if (state === 'draft' && !opts.includeDrafts) continue;
     const { scope, brand } = classifyScope(cap.dir);
+    const packManifest = loadPackManifest(repo, cap.yaml.pack);
     const body = readBodyMarkdown(cap);
     const detail = extractH2Section(body, '能力说明');
     const scenarios = extractH2Section(body, '适用场景');
@@ -173,6 +190,7 @@ export async function buildInventory(opts = {}) {
       state,
       scope,
       brand,
+      example: packManifest.example,
       dir: cap.dir,
     });
   }
@@ -206,20 +224,25 @@ export function renderReadmeBlock(inv) {
   lines.push('');
   lines.push('> 由 `node tools/inventory.mjs --readme` 从 registry + 能力 body 的 `## 能力说明` / `## 适用场景` 章节派生。草稿不出现。');
   lines.push('');
-  const renderTable = (title, entries) => {
+  const renderTable = (title, entries, note = null) => {
     if (!entries || entries.length === 0) return;
     lines.push(`### ${title}`);
     lines.push('');
+    if (note) { lines.push(`> ${note}`); lines.push(''); }
     lines.push('| id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |');
     lines.push('|---|---|---|---|---|---|---|');
     for (const e of entries) {
       const zh = e.display_name_zh || e.id;
       const tag = (e.scenarioTag || '-').replace(/\|/g, '\\\\|');
-      lines.push(`| \`${e.id}\` | ${zh} | ${e.kind} | ${platformCell(e)} | ${tag} | ${STATE_LABEL[e.state] || e.state} | ${e.version} |`);
+      const exMark = e.example ? ' · 示例' : '';
+      lines.push(`| \`${e.id}\` | ${zh}${exMark} | ${e.kind} | ${platformCell(e)} | ${tag} | ${STATE_LABEL[e.state] || e.state} | ${e.version} |`);
     }
     lines.push('');
   };
-  renderTable('通用能力', inv.general);
+  const tooling = inv.general.filter((e) => !e.example);
+  const examples = inv.general.filter((e) => e.example);
+  renderTable('OpsForge 工具能力', tooling);
+  renderTable('示例能力（dogfood · 非核心交付）', examples, '以下能力来自示例包，用于演示业务团队如何用 OpsForge 沉淀工作；业务内容为示意，不应直接当作生产工具。');
   for (const brand of Object.keys(inv.brands).sort()) {
     renderTable(`品牌定制：${brand}`, inv.brands[brand]);
   }
@@ -246,7 +269,8 @@ export function renderDiscoverAll(inv /*, opts */) {
       lines.push(`【${KIND_LABEL[k]}类】`);
       for (const e of list) {
         const stateTag = e.state === 'draft' ? '[草稿] ' : (e.state === 'staged' ? '[暂存] ' : '');
-        lines.push(`  ▌ ${e.id}  v${e.version}  ${e.light}  ${stateTag}`);
+        const exTag = e.example ? '[示例] ' : '';
+        lines.push(`  ▌ ${e.id}  v${e.version}  ${e.light}  ${exTag}${stateTag}`);
         if (e.display_name_zh) lines.push(`    ${e.display_name_zh}`);
         lines.push('    【能力说明】');
         if (e.detail) {
@@ -271,7 +295,8 @@ export function renderDiscoverAll(inv /*, opts */) {
       lines.push('');
     }
   };
-  renderGroup('通用能力', inv.general);
+  renderGroup('OpsForge 工具能力', inv.general.filter((e) => !e.example));
+  renderGroup('示例能力（dogfood）', inv.general.filter((e) => e.example));
   for (const brand of Object.keys(inv.brands).sort()) {
     renderGroup(`品牌定制：${brand}`, inv.brands[brand]);
   }
