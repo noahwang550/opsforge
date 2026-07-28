@@ -49,6 +49,7 @@ node tools/opsforge-bootstrap.mjs --platform claude-code --project default
 - `@opsforge` 或 `@opsforge-wizard` → 6 选项中文菜单（新建/安装/我的能力/诊断/报告/反馈）
 - 自然语言："帮我装营销团队包" → 引导式安装（质量灯+商用标签+依赖确认），后台装完出中文绿黄红报告
 - 装完用：`@copywriter` 调子代理、`/workflow-campaign-retrospect` 斜杠命令、MCP 工具直接问数据
+- 沉淀一件重复工作成能力：`@capability-interviewer`（引导访谈）→ `@capability-distiller`（蒸馏成骨架+系统提示词）→ 跑通门 → `--promote-case` 并入回归。Tier 2/3 用纯 prompt 脚本 `opsforge-interview` skill 走访谈期。详见 [`docs/methodology/capability-creation.md`](docs/methodology/capability-creation.md)
 
 ### 其它平台
 
@@ -69,6 +70,11 @@ node install.mjs --doctor --platform claude-code   # healthy 自检
 
 # 创建能力（唯一合法方式，禁手建目录）
 node tools/new-capability.mjs --kind skill --slug <slug> --name <name>
+
+# 能力新建方法论（访谈→蒸馏→跑通→迭代，详见 docs/methodology/capability-creation.md）
+#   平台内：@capability-interviewer → @capability-distiller（引导式，非 CLI 问答）
+node tools/opsforge.mjs set-phase <capDir> <phase>          # interview_done|distill_done|v0.1_built|...
+node tools/new-capability.mjs --promote-case <srcDir> <caseFile>  # 单 case 并入回归用例（R29+良构+run-pass 门）
 
 # 交互菜单 / 管理
 node tools/opsforge.mjs menu
@@ -106,9 +112,12 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
 |---|---|---|---|---|---|---|
 | `marketing-team.copywriter` | 营销文案写手 | agent | claude-code(T1) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
+| `opsforge-meta.capability-distiller` | 能力蒸馏器 | agent | claude-code(T1) | 访谈期产出的 interview.md 需要转成能力骨架 + 系统提示词草稿 | 已发布 | 1.0.0 |
+| `opsforge-meta.capability-interviewer` | 能力访谈员 | agent | claude-code(T1) | 业务运营同学要把一件重复工作沉淀成能力，但写不出系统提示词 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
 | `marketing-team.activity-summary` | 活动总结 | skill | claude-code(T1) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
 | `marketing-team.bi-connector` | BI连接器 | mcp | claude-code(T1) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
 | `marketing-team.campaign-retrospect` | 活动回顾 | workflow | claude-code(T1) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
@@ -133,7 +142,11 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 
 ## 状态
 
-Phase 1+2+3+3.6 SHIPPED（绿条 341/341，6 道 gate 全绿，7 个能力）。Phase 4（治理飞轮）规划中。详见 [`PROGRESS.md`](PROGRESS.md)。
+Phase 1+2+3+3.6+4 SHIPPED（绿条 489/489，6 道 gate 全绿，10 个能力）。Phase 4 已交付两刀：skill-up 融合（把 `alibaba/skill-up` 可吸收概念内化进 v8 eval harness）+ **能力新建方法论**（访谈→蒸馏→跑通→迭代 5 期流水线，R24–R31 行为门，`@capability-interviewer` / `@capability-distiller` 引导式沉淀）。治理飞轮其余项（`pickVersion` wiring / 远程 registry / 趋势看板 / workflow-runner v0.2）pending。详见 [`PROGRESS.md`](PROGRESS.md)。
+
+## 能力新建方法论
+
+运营同学沉淀一件重复工作成能力，**不再往空模板填字**——改为 `@capability-interviewer`（或纯 prompt 脚本 `opsforge-interview` skill，Tier 2/3 可用）引导访谈产出 `interview.md`，再 `@capability-distiller` 蒸馏成能力骨架 + 系统提示词草稿，跑通门（≥2 case 真实输入 dry-run）后 `opsforge set-phase` 推进、`--promote-case` 并入回归用例。完整流程见 [`docs/methodology/capability-creation.md`](docs/methodology/capability-creation.md)。
 
 ## License
 
