@@ -134,7 +134,7 @@ test('T_inv6 renderReadmeBlock has 适用场景 column + brand section', async (
   const inv = await buildInventory({ repoRoot: root });
   const md = renderReadmeBlock(inv);
   assert.match(md, /\| id \| 中文名 \| 类型 \| 平台 \| 适用场景 \| 状态 \| 版本 \|/);
-  assert.match(md, /### 通用能力/);
+  assert.match(md, /### OpsForge 工具能力/);
   assert.match(md, /### 品牌定制：acme/);
   assert.match(md, /`acme.bot`/);
 });
@@ -146,7 +146,7 @@ test('T_inv7 renderDiscoverAll renders grouped cards with light + platform', asy
   writeRegistry(root, ['foo.bar']);
   const inv = await buildInventory({ repoRoot: root });
   const out = renderDiscoverAll(inv);
-  assert.match(out, /=== 通用能力 ===/);
+  assert.match(out, /=== OpsForge 工具能力 ===/);
   assert.match(out, /【agent类】/);
   assert.match(out, /▌ foo\.bar/);
   assert.match(out, /【能力说明】/);
