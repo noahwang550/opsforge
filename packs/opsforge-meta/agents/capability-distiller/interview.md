@@ -14,12 +14,14 @@
 ## 流程实录
 
 ### 步骤1 形状推导
+
 数据: interview.md 的流程实录
 决策: 按实录特征推导 kind（skill/agent/mcp/workflow）附理由
 人工闸门: 作者按场景匹配确认 kind，不确认 enum
 交付工件: kind 选择 + 理由
 
 ### 步骤2 字段默认值
+
 数据: 实录的真实样本
 决策: 给 quadrant/source/confidence/allow_exact_reason 默认值
 人工闸门: 作者确认 ① 都对 ② 有一条不对
