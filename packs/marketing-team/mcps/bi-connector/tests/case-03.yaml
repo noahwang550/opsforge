@@ -1,4 +1,14 @@
 name: case-003
 input:
   metric: conversions
-expect: human
+  auth: 缺失 BI_API_KEY
+expect: llm_judge
+expected: 鉴权缺失时应 fail loud 拒绝查询，不静默返回
+judge_rubric: 评分 0-1，是否在鉴权缺失时正确 fail loud 拒绝查询而非静默返回数据。满分要求明确报错不泄露数据。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

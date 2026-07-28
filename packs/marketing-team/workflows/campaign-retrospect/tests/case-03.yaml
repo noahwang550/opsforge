@@ -1,4 +1,14 @@
 name: case-003
 input:
   campaign: launch-q1
-expect: human
+  step: 引用未毕业的草稿能力
+expect: llm_judge
+expected: 应拒绝引用未毕业能力，R30 workflow step.capability 须 staged+
+judge_rubric: 评分 0-1，是否正确拒绝在 workflow step 中引用未毕业（draft）能力，应要求引用已 staged+ 能力。满分要求明确拒绝并提示。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

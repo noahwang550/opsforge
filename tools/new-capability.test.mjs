@@ -161,18 +161,22 @@ test('T27 brand skill scaffold injects customer and validates staged', async () 
     let raw = fs2.readFileSync(skillPath, 'utf8');
     const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
     if (m) {
-      const body = `## 能力说明\n\nThis is a done capability body for testing. It performs content operations including creation, review, and reporting. The skill processes input data and generates output based on configured rules and templates. Quality checks are done on all content before delivery. Additional context ensures the body meets minimum substance thresholds for the OpsForge validation gate. This section covers primary workflow steps, input handling, output format, error handling, and edge case management. The capability supports multiple input formats and produces structured output suitable for downstream processing. Configuration parameters allow customization per project requirements. Logging hooks are integrated for observability. The implementation follows best practices for maintainability and extensibility. Documentation references are included for each function.\n\n## 适用场景\n\n- content creation and copywriting\n- review and reporting`;
+      const runInstr = `You are a done capability. When invoked, receive the input data from the configured source path without pasting raw values, validate it against the schema, aggregate the performance indicators, decide the output format based on the configured rules, generate the structured report with key findings trends and recommendations, identify outliers and notable patterns, and present the results in a clear format suitable for stakeholders. Support multiple report formats including executive summaries and detailed breakdowns. Handle edge cases and boundary conditions gracefully with degradation. Never fabricate data; when a data source is unavailable, degrade to an empty report with an alert rather than crashing. All generated content passes a quality checkpoint before delivery. Maintain consistency across invocations and reuse style memory where applicable.`;
+      const body = `## 能力说明\n\nThis is a done capability body for testing. It performs content operations including creation, review, and reporting. The skill processes input data and generates output based on configured rules and templates. Quality checks are done on all content before delivery. Additional context ensures the body meets minimum substance thresholds for the OpsForge validation gate. This section covers primary workflow steps, input handling, output format, error handling, and edge case management. The capability supports multiple input formats and produces structured output suitable for downstream processing. Configuration parameters allow customization per project requirements. Logging hooks are integrated for observability. The implementation follows best practices for maintainability and extensibility. Documentation references are included for each function.\n\n## 适用场景\n\n- content creation and copywriting\n- review and reporting\n## 运行流程\n\n### 步骤1 接收数据\n数据:输入文件路径\n决策:校验通过\n交付工件:解析结果\n\n### 步骤2 生成输出\n数据:聚合指标\n决策:格式选择\n交付工件:最终报告\n\n## 失败降级\n\n- 数据源不可用时降级返回空报告并告警\n\n## 依赖\n\n- 无\n\n## 运行指令\n\n${runInstr}\n\n## 蒸馏日志\n\n- 接收数据来自实录步骤1\n- 生成输出来自实录步骤2`;
       raw = `---\n${m[1]}\n---\n${body}`;
       fs2.writeFileSync(skillPath, raw);
     }
     const testsDir = destPath + '/tests';
     const caseFiles = ['case-01.yaml', 'case-02.yaml', 'case-03.yaml'];
+    const QUADS = [
+      { q: 'positive', exp: 'contains', rubric: null },
+      { q: 'boundary', exp: 'contains', rubric: null },
+      { q: 'negative', exp: 'llm_judge', rubric: 'a'.repeat(25) },
+    ];
     caseFiles.forEach((f, i) => {
-      const p = testsDir + '/' + f;
-      let s = fs2.readFileSync(p, 'utf8');
-      s = s.replace(/input: done/, `input: case-input-${i}`);
-      s = s.replace(/expected: done/, `expected: case-expected-${i}`);
-      fs2.writeFileSync(p, s);
+      const qd = QUADS[i % 3];
+      const yamlStr = `name: case-${i}\ninput: case-input-${i}\nexpect: ${qd.exp}\nexpected: case-expected-${i}\nschema_ref: null\njudge_rubric: ${qd.rubric ? JSON.stringify(qd.rubric) : 'null'}\njudge_threshold: 0.7\nweight: 1.0\nquadrant: ${qd.q}\nsource: recalled\nconfidence: med\nallow_exact_reason: null\nref: null\n`;
+      fs2.writeFileSync(testsDir + '/' + f, yamlStr);
     });
   }
   const { destPath: staged } = promote(destPath, { templatesDir: REAL_TEMPLATES });

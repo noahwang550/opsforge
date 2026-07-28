@@ -3,3 +3,8 @@ input:
   prompt: 启动 OpsForge
 expect: contains
 expected: OpsForge 能力工坊
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

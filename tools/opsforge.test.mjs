@@ -186,8 +186,8 @@ test('OP10 wizard scaffolds a new capability from interactive prompts', async ()
   const origCwd = process.cwd();
   process.chdir(tmp);
   try {
-    // Mock readline returning: kind=skill, name=bot, brand=(empty), slug=foo
-    const rl = mockRl(['skill', 'bot', '', 'foo']);
+    // Mock readline: route=② (escape hatch direct scaffold), then kind=skill, name=bot, brand=(empty), slug=foo
+    const rl = mockRl(['2', 'skill', 'bot', '', 'foo']);
     const { cmdWizard } = await import('./opsforge.mjs');
     const code = await cmdWizard(rl, { root: tmp });
     assert.equal(code, 0);

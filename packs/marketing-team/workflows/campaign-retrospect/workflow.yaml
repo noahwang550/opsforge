@@ -6,7 +6,7 @@ owner: marketing-team
 display_name: Campaign Retrospect
 display_name_zh: 活动回顾
 display_name_en: Campaign Retrospect
-description: retrospect workflow that reviews campaign performance
+description: '【示例能力】retrospect workflow that reviews campaign performance'
 platforms:
   - claude-code
 params_schema: params.schema.json

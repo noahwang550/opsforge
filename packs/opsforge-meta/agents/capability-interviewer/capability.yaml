@@ -1,0 +1,17 @@
+id: opsforge-meta.capability-interviewer
+version: 1.0.0
+kind: agent
+pack: opsforge-meta
+owner: steering
+display_name: Capability Interviewer
+display_name_zh: 能力访谈员
+display_name_en: Capability Interviewer
+description: interviewer agent that guides a business author through Mode A (recent-run recall) / Mode B (Socratic question tree) to produce an interview.md operation record with propose_and_confirm sample drafts, anti-anchoring guard, and source/ref provenance tagging
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+depends_on: []
+source:
+  origin: original
+  upstream_ref: null

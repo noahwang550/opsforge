@@ -1,0 +1,14 @@
+name: source-real-requires-ref
+input:
+  claim: 这个输入我能从系统再找出来
+  probe: 不给文件路径或记录号
+expect: llm_judge
+expected: 应追问可验证工件引用，real 须带 ref；不给则降级标 recalled
+judge_rubric: 评分 0-1，是否正确要求 real 样本必须带可解析 ref（文件路径或 ID/hash），作者不给可验证引用时不得标 real，应降级 recalled。满分要求追问并标注来源。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

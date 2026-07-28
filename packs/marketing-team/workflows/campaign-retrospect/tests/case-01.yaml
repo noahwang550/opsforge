@@ -1,5 +1,10 @@
 name: case-001
 input:
   campaign: summer-2026
-expect: exact
+expect: contains
 expected: retrospect report for summer-2026 campaign
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

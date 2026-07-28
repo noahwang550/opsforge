@@ -3,3 +3,8 @@ input:
   choice: "0"
 expect: exact
 expected: 退出向导并返回主菜单
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: 边界选项 0 唯一确定退出，允许 exact
+ref: null

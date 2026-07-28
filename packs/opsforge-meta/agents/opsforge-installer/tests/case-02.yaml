@@ -3,3 +3,8 @@ input:
   action: runInstall foo.bar
 expect: contains
 expected: 转发 install.mjs install 并落盘 manifest
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

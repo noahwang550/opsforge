@@ -1,0 +1,13 @@
+name: mode-a-segment-recall
+input:
+  mode: A
+  scenario: 周报生成流程
+expect: contains
+expected:
+  - 上次
+  - 步骤
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

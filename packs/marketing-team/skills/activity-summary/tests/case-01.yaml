@@ -1,5 +1,10 @@
 name: case-001
 input:
   period: weekly
-expect: exact
+expect: contains
 expected: weekly activity summary with key metrics
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

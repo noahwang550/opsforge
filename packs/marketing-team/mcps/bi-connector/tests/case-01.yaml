@@ -1,5 +1,10 @@
 name: case-001
 input:
   metric: impressions
-expect: exact
-expected: '{"metric":"impressions","value":0}'
+expect: contains
+expected: metric
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

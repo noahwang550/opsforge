@@ -1,8 +1,13 @@
 name: __FILL_ME__
 input: __FILL_ME__
-expect: exact
+expect: contains
 expected: __FILL_ME__
 schema_ref: null
 judge_rubric: null
 judge_threshold: 0.7
 weight: 1.0
+quadrant: positive
+source: __FILL_ME__
+confidence: __FILL_ME__
+allow_exact_reason: null
+ref: null

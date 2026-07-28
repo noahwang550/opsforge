@@ -5,3 +5,8 @@ expect: contains
 expected:
   - retrospect
   - campaign
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

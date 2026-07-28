@@ -27,3 +27,31 @@ __FILL_ME__
 ## 适用场景
 
 - __FILL_ME__
+
+## 运行流程
+
+### 步骤1 __FILL_ME__
+数据: __FILL_ME__
+决策: __FILL_ME__
+交付工件: __FILL_ME__
+
+### 步骤2 __FILL_ME__
+数据: __FILL_ME__
+决策: __FILL_ME__
+交付工件: __FILL_ME__
+
+## 失败降级
+
+- __FILL_ME__
+
+## 依赖
+
+- __FILL_ME__
+
+## 运行指令
+
+__FILL_ME__
+
+## 蒸馏日志
+
+- __FILL_ME__ 来自实录步骤1

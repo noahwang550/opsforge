@@ -15,6 +15,10 @@ steps:
     capability: __FILL_ME__
     inputs: {}
     outputs: []
+  - id: __FILL_ME__
+    capability: __FILL_ME__
+    inputs: {}
+    outputs: []
 outputs: {}
 tests: tests/
 changelog: CHANGELOG.md

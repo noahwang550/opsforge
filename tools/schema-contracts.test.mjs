@@ -200,20 +200,24 @@ test('SC11 capability.schema accepts optional requires field', () => {
   assert.ok(v(withRequires), JSON.stringify(v.errors));
 });
 
-// ---------- SC12 templates tests/case-01.yaml has 7 fields ----------
-test('SC12 all template case files have 7 fields', () => {
+// ---------- SC12 templates tests/case-*.yaml field set ----------
+// methodology §7.1: skill/agent/mcp template cases carry 13 fields (5 new: quadrant/
+// source/confidence/allow_exact_reason/ref). workflow/bundle/brand-draft still carry
+// the legacy 7-field skeleton (their tests are filled by the distiller at staged+).
+test('SC12 all template case files have the expected field set', () => {
   const kinds = ['agent', 'skill', 'mcp', 'workflow', 'bundle', 'brand-draft'];
+  const NEW = ['allow_exact_reason', 'confidence', 'expect', 'expected', 'input', 'judge_rubric', 'judge_threshold', 'name', 'quadrant', 'ref', 'schema_ref', 'source', 'weight'];
+  const OLD = ['expect', 'expected', 'input', 'judge_rubric', 'judge_threshold', 'name', 'schema_ref', 'weight'];
   for (const k of kinds) {
+    const isNew = ['agent', 'skill', 'mcp'].includes(k);
+    const expectedKeys = isNew ? NEW : OLD;
     for (const n of ['01', '02', '03']) {
       const raw = fs.readFileSync(path.join(TEMPLATES_DIR, k, 'tests', `case-${n}.yaml`), 'utf8');
       const parsed = yaml.load(raw);
       const keys = Object.keys(parsed).sort();
-      assert.deepEqual(keys, ['expect', 'expected', 'input', 'judge_rubric', 'judge_threshold', 'name', 'schema_ref', 'weight'], `${k}/tests/case-${n}.yaml keys`);
-      assert.equal(parsed.expect, 'exact');
+      assert.deepEqual(keys, expectedKeys, `${k}/tests/case-${n}.yaml keys`);
       assert.equal(parsed.judge_threshold, 0.7);
       assert.equal(parsed.weight, 1.0);
-      assert.equal(parsed.schema_ref, null);
-      assert.equal(parsed.judge_rubric, null);
       assert.equal(parsed.name, '__FILL_ME__');
       assert.equal(parsed.input, '__FILL_ME__');
       assert.equal(parsed.expected, '__FILL_ME__');

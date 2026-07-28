@@ -45,7 +45,7 @@ export function detectPlatform(opts = {}) {
 export async function main(argv = process.argv.slice(2)) {
   const cmd = argv[0];
   if (!cmd) {
-    console.error('usage: opsforge <menu|new|install|status|doctor|discover|report|feedback|wizard>');
+    console.error('usage: opsforge <menu|new|install|status|doctor|discover|report|feedback|wizard|set-phase>');
     console.error('运行 opsforge menu 进入交互菜单');
     return 2;
   }
@@ -64,9 +64,10 @@ export async function main(argv = process.argv.slice(2)) {
       case 'evals-import': return await cmdEvalsImport(argv.slice(1));
       case 'evals-export': return await cmdEvalsExport(argv.slice(1));
       case 'benchmark': return await cmdBenchmark(argv.slice(1));
+      case 'set-phase': return await cmdSetPhase(argv.slice(1));
       default:
         console.error(`opsforge: unknown command "${cmd}"`);
-        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard, evolve, evals-import, evals-export, benchmark');
+        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard, evolve, evals-import, evals-export, benchmark, set-phase');
         return 2;
     }
   } catch (e) {
@@ -163,8 +164,22 @@ export async function cmdMenu(rl, opts = {}) {
   }
 }
 
-/** 菜单分支 1：新建能力（scaffold）。复用 promptNew + new-capability.mjs。 */
+/** 菜单分支 1：新建能力。methodology §3：默认路由到 @capability-interviewer
+ *  （访谈→蒸馏→跑通五期，LLM 引导式沉淀）；保留 promptNew 直跑 scaffold 作逃生路径（J.12）。 */
 async function cmdNewFlow(rl, opts = {}) {
+  const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
+  console.log('--- 新建能力 ---');
+  console.log('推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。');
+  console.log('  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）');
+  console.log('  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）');
+  const ch = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
+  if (ch !== '2') {
+    console.log('请调出 @capability-interviewer（claude-code 形态）；非 claude-code 平台把');
+    console.log('packs/opsforge-meta/skills/opsforge-interview/SKILL.md 内容贴到任意 LLM 跑一遍，');
+    console.log('产出 _drafts/<slug>/interview.md 后交给 @capability-distiller 蒸馏。set-phase 对你透明。');
+    return 0;
+  }
+  // 逃生路径：保留 promptNew（向后兼容 + 测试可能依赖，J.12）
   const o = await promptNew(rl);
   const { scaffold } = await import('./new-capability.mjs');
   const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
@@ -211,6 +226,16 @@ async function cmdWizardInteractive(args) {
 export async function cmdWizard(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
   console.log('OpsForge 向导 — 引导式创建能力');
+  console.log('推荐先走访谈员 @capability-interviewer（五期：访谈→蒸馏→跑通→迭代），LLM 引导式沉淀。');
+  console.log('  ① 调出 @capability-interviewer  ② 直接脚手架（逃生路径）');
+  const route = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
+  if (route !== '2') {
+    console.log('请调出 @capability-interviewer；非 claude-code 平台用 opsforge-interview 纯 prompt 脚本。');
+    console.log('产出 _drafts/<slug>/interview.md 后交给 @capability-distiller 蒸馏。');
+    return 0;
+  }
+  // 逃生路径：直接 scaffold（保留 promptNew 问答，J.12）
+  console.log('--- 逃生路径：直接脚手架 ---');
   const kind = (await ask('kind (agent/skill/mcp/workflow/bundle): ')).trim() || 'agent';
   const name = (await ask('name (e.g. copywriter): ')).trim();
   if (!name) { console.error('name is required'); return 1; }
@@ -266,6 +291,13 @@ export async function cmdDiscover(argsOrOpts) {
     const qLight = c.effectiveness_flag === 'degraded' ? '黄' : '绿';
     const comm = c.commercial === false ? '[黄 不可商用]' : '[绿 可商用]';
     console.log(`  ${c.id}@${c.version}  ${qLight}  ${comm}  触发 @${name}`);
+    // methodology §5.4 C4: passive evolve trigger (feedback≤2 or 3rd discover/doctor call).
+    try {
+      const trig = evolveTriggerSuggest(c.id, opsforgeHome);
+      if (trig.suggest) {
+        console.log(`    [黄] 考虑跑 \`opsforge evolve ${c.id}\` 补一条上次崩了的情况 (${trig.reason})`);
+      }
+    } catch { /* no capId — skip */ }
   }
   return 0;
 }
@@ -383,6 +415,19 @@ async function cmdDoctor(args) {
     for (const i of r.issues) {
       console.log(`  [${i.severity}] ${i.check}: ${i.detail}`);
       if (i.fix) console.log(`    fix: ${i.fix}`);
+    }
+    // methodology §5.4 C4: passive evolve trigger per installed cap (feedback≤2 or 3rd call).
+    const manifestPath = path.join(resolveOpsforgeHome(), 'manifests', `${project}.manifest.json`);
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        for (const cap of (manifest.capabilities || [])) {
+          const trig = evolveTriggerSuggest(cap.id, resolveOpsforgeHome());
+          if (trig.suggest) {
+            console.log(`  [黄] ${cap.id}: 考虑跑 \`opsforge evolve ${cap.id}\` 补一条上次崩了的情况 (${trig.reason})`);
+          }
+        }
+      } catch { /* manifest parse — skip trigger */ }
     }
     return r.healthy ? 0 : 1;
   } catch (e) {
@@ -690,6 +735,76 @@ async function cmdBenchmark(args) {
     console.error(`opsforge benchmark: ${e.message}`);
     return 1;
   }
+}
+
+/**
+ * opsforge set-phase <capDir> <phase> [--built-with-model <endpoint:version>] [--built-at <iso>]
+ * methodology §7.2: forwards to new-capability.mjs writeOpsforgeState (no duplicated copy —
+ * J.6 single source of truth). Pure argv, no readline (Windows-compatible). In-platform
+ * agents call this via Bash; authors never edit .opsforge-state.json directly.
+ */
+async function cmdSetPhase(args) {
+  const opts = parseSimpleOpts(args);
+  const capDir = opts._[0];
+  const phase = opts._[1];
+  if (!capDir || !phase) {
+    console.error('opsforge set-phase: 用法: set-phase <capDir> <phase> [--built-with-model <endpoint:version>] [--built-at <iso>]');
+    return 2;
+  }
+  const VALID_PHASES = ['interview_done', 'distill_done', 'v0.1_built', 'iteration_converged', 'iteration_capped'];
+  if (!VALID_PHASES.includes(phase)) {
+    console.error(`opsforge set-phase: phase "${phase}" 不合法; 允许: ${VALID_PHASES.join(', ')}`);
+    return 1;
+  }
+  const { writeOpsforgeState } = await import('./new-capability.mjs');
+  const statePath = path.join(capDir, '.opsforge-state.json');
+  let existing = null;
+  if (fs.existsSync(statePath)) {
+    try { existing = JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch { existing = null; }
+  }
+  const curState = (existing && existing.state) || 'staged';
+  let builtWithModel;
+  if (opts['built-with-model'] !== undefined) {
+    // Split on the LAST colon so endpoint URLs with a port (https://api.x:8080:v1)
+    // keep the host+port in `endpoint` and only the trailing segment is `version`.
+    const raw = String(opts['built-with-model']);
+    const ci = raw.lastIndexOf(':');
+    builtWithModel = ci > 0
+      ? { endpoint: raw.slice(0, ci), version: raw.slice(ci + 1) }
+      : { endpoint: raw, version: '' };
+  }
+  const builtAt = opts['built-at'];
+  writeOpsforgeState(capDir, curState, curState, { phase, ...(builtWithModel ? { builtWithModel } : {}), ...(builtAt !== undefined ? { builtAt } : {}) });
+  console.log(`绿 phase: ${phase} (capDir: ${capDir})`);
+  return 0;
+}
+
+/**
+ * evolveTriggerSuggest(capId, opsforgeHome) — methodology §5.4 C4 passive trigger.
+ * Increments a per-cap call counter (~/.opsforge/.evolve-calls.json) and returns
+ * {suggest, reason, callCount}. Suggests when feedback≤2 OR 3rd call (discover/doctor).
+ * No feedback data → no trigger (doc risk #9). Side-effect: counter write (best-effort).
+ */
+export function evolveTriggerSuggest(capId, opsforgeHome) {
+  assertCapId(capId);
+  const home = opsforgeHome || resolveOpsforgeHome();
+  const counterPath = path.join(home, '.evolve-calls.json');
+  let counts = {};
+  try { counts = JSON.parse(fs.readFileSync(counterPath, 'utf8')); } catch { counts = {}; }
+  counts[capId] = (counts[capId] || 0) + 1;
+  try { fs.mkdirSync(path.dirname(counterPath), { recursive: true }); atomicWriteSync(counterPath, JSON.stringify(counts, null, 2)); } catch { /* best-effort */ }
+  const pack = capId.split('.')[0];
+  const fbPath = path.join(home, 'kb', pack, 'feedback', `${capId}.jsonl`);
+  let lowFeedback = false;
+  if (fs.existsSync(fbPath)) {
+    for (const line of fs.readFileSync(fbPath, 'utf8').split(/\r?\n/).filter(Boolean)) {
+      try { const e = JSON.parse(line); if (typeof e.rating === 'number' && e.rating <= 2) lowFeedback = true; }
+      catch { /* skip */ }
+    }
+  }
+  if (lowFeedback) return { suggest: true, reason: 'feedback≤2', callCount: counts[capId] };
+  if (counts[capId] >= 3) return { suggest: true, reason: '3rd-call', callCount: counts[capId] };
+  return { suggest: false, reason: null, callCount: counts[capId] };
 }
 
 const invokedDirect = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('opsforge.mjs');
