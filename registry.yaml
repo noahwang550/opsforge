@@ -69,3 +69,10 @@ capabilities:
         released_at: '2026-07-24'
         commit: unknown
     changelog_index: packs/opsforge-meta/skills/opsforge-wizard/CHANGELOG.md
+  third-party.sy-automl-mcp:
+    current: 0.1.0
+    history:
+      - version: 0.1.0
+        released_at: '2026-07-29'
+        commit: 139ea95
+    changelog_index: packs/third-party/mcps/sy-automl-mcp/CHANGELOG.md

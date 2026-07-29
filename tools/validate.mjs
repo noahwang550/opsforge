@@ -31,7 +31,10 @@ const PLACEHOLDER_TOKENS = ['__FILL_ME__', 'TODO', 'FIXME'];
 // excluded from skeleton_guard to avoid R8 false positive.
 // Twin: tools/new-capability.mjs SKELETON_GUARD_EXCLUSIONS — kept in sync deliberately
 // (that copy omits `benchmark-report.json` because scaffold/promote only see draft dirs).
-const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json', 'interview.md'];
+// Phase 4 fix: upstream-ref.json — intake.mjs writes it into every --third-party draft
+// after scaffold; without the exclusion R15 entry_guard / R8 skeleton_guard false-positive
+// on every intaked third-party capability.
+const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json', 'interview.md', 'upstream-ref.json'];
 /** Test hook: returns the current exclusions list (read-only snapshot). */
 export function SKELETON_GUARD_EXCLUSIONS_GET() {
   return [...SKELETON_GUARD_EXCLUSIONS];
@@ -201,10 +204,14 @@ export function checkEntryGuard(cap) {
 }
 
 // R7 placeholder_clean
-export function checkPlaceholder(cap) {
-  const files = walkFiles(cap.dir);
-  for (const rel of files) {
-    const full = path.join(cap.dir, rel);
+// opts.manifestOnly: drafts only enforce it in the manifest (the business fields the
+// author owns); body/CHANGELOG/tests placeholders in drafts are the working state
+// (scaffold ships them with __FILL_ME__) and stay enforced at staged+.
+export function checkPlaceholder(cap, opts = {}) {
+  const files = opts.manifestOnly && cap.manifestFile
+    ? [cap.path]
+    : walkFiles(cap.dir).map((f) => path.join(cap.dir, f));
+  for (const full of files) {
     const lines = readText(full).split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
       for (const tok of PLACEHOLDER_TOKENS) {
@@ -423,7 +430,7 @@ export function checkDraftRelaxed(cap, ctx = {}) {
   }
   checks.push(checkIdUnique(cap, allCaps));
   checks.push(checkVersionLock(cap));
-  checks.push(checkPlaceholder(cap));
+  checks.push(checkPlaceholder(cap, { manifestOnly: true }));
   checks.push(checkDisplayNamesI18n(cap));
   checks.push(checkCustomerDirConsistency(cap));
   checks.push(checkEntryGuard(cap));

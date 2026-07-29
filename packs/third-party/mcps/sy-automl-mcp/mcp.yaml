@@ -1,0 +1,53 @@
+id: third-party.sy-automl-mcp
+version: 0.1.0
+kind: mcp
+pack: third-party
+owner: third-party
+# customer: third-party
+display_name: AutoML 建模连接器
+display_name_zh: AutoML 建模连接器
+display_name_en: AutoML MCP Connector
+description: AutoGluon 自动建模 MCP 服务 — 数据加载、训练、预测、评估、模型管理全流程
+platforms: [claude-code]
+entrypoint: source.md
+tests: tests/
+changelog: CHANGELOG.md
+transport: stdio            # stdio | sse | http
+config_template:
+  auth_schema: []           # 声明需要的 env 变量名，不含密钥
+tools:                    # 每项 {name, description, inputSchema}
+  - name: load_dataset
+    description: 加载数据集（CSV 等表格数据）为 dataset_id，供后续训练 / 预测引用
+    inputSchema:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+  - name: train_tabular
+    description: 提交表格自动建模训练任务（后台异步执行），返回 task_id
+    inputSchema:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+        target:
+          type: string
+  - name: predict_tabular
+    description: 用已训练的表格模型对新数据做预测
+    inputSchema:
+      type: object
+      properties:
+        model_id:
+          type: string
+        dataset_id:
+          type: string
+  - name: get_task_status
+    description: 查询后台训练任务进度与状态
+    inputSchema:
+      type: object
+      properties:
+        task_id:
+          type: string
+source:
+  origin: forked
+  upstream_ref: https://github.com/noahwang550/sy-automl-mcp

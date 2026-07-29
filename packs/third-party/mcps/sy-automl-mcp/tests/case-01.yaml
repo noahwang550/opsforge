@@ -1,0 +1,12 @@
+name: case-正常-鉴权缺失说明
+input:
+  prompt: 说明这个能力在鉴权缺失时应该怎么做
+expect: contains
+expected:
+  - 错误信封
+  - 拒绝
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

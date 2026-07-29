@@ -253,6 +253,38 @@ test('OP14 cmdMenu menu keyword returns to top then 0 exits', async () => {
   assert.equal(code, 0);
 });
 
+// OP14b cmdMenu: option 1 → ③ 收录第三方能力 — intake flow reachable.
+// Mock: choose 1, then 3, then a non-https URL hits the early-exit guard (no network).
+test('OP14b cmdMenu option 1 → 3 intake flow reachable (non-https guard)', async () => {
+  const rl = mockRl(['1', '3', 'not-a-url', '0']);
+  const code = await cmdMenu(rl, { nonInteractive: true });
+  assert.equal(code, 0);
+});
+
+// OP14c cmdIntakeFlow: https guard rejects non-https URLs before any network call.
+test('OP14c cmdIntakeFlow rejects non-https git URL', async () => {
+  const rl = mockRl(['ssh://git@github.com/foo/bar.git']);
+  const { cmdIntakeFlow } = await import('./opsforge.mjs');
+  const code = await cmdIntakeFlow(rl, {});
+  assert.equal(code, 1);
+});
+
+// OP14d cmdIntakeFlow: empty repo URL cancels early.
+test('OP14d cmdIntakeFlow cancels on empty repo URL', async () => {
+  const rl = mockRl(['']);
+  const { cmdIntakeFlow } = await import('./opsforge.mjs');
+  const code = await cmdIntakeFlow(rl, {});
+  assert.equal(code, 1);
+});
+
+// OP14e cmdIntakeFlow: invalid kind rejected.
+test('OP14e cmdIntakeFlow rejects invalid kind', async () => {
+  const rl = mockRl(['https://github.com/foo/bar.git', 'bogus-kind']);
+  const { cmdIntakeFlow } = await import('./opsforge.mjs');
+  const code = await cmdIntakeFlow(rl, {});
+  assert.equal(code, 1);
+});
+
 // OP15 promptInstallFlow: 5 steps — platform/method/browse/deps/confirm.
 test('OP15 promptInstallFlow collects 5-step install input', async () => {
   const tmp = mkTmp();

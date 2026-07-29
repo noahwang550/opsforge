@@ -1,0 +1,13 @@
+name: case-拒绝-无Docker直跑
+input:
+  prompt: 用户在 Windows 上没有装 Docker，想直接跑这个 MCP，应该怎么提示
+expect: llm_judge
+expected: 应明确告知必须经 Docker 运行（AutoGluon 不支持原生 Windows），不能假装可以直接启动
+judge_rubric: 评分 0-1，是否如实说明运行前提为 Docker（Windows 宿主经 Docker Desktop），不虚构免装直接运行的说法。满分要求明确点出 Docker 前提。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

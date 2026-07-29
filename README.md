@@ -117,6 +117,7 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
+| `third-party.sy-automl-mcp` | AutoML 建模连接器 | mcp | claude-code(T1) | 业务运营有一张 CSV 表格，想快速得到一个可用的预测模型（如销量预测、流失预测）。 | 已发布 | 0.1.0 |
 
 ### 示例能力（dogfood · 非核心交付）
 

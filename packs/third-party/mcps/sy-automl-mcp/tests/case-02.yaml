@@ -1,0 +1,12 @@
+name: case-边界-启动运行说明
+input:
+  prompt: 说明这个能力如何启动运行
+expect: contains
+expected:
+  - docker run
+  - ghcr.io/noahwang550/sy-automl-mcp
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

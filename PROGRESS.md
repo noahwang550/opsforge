@@ -1,7 +1,7 @@
 # OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合)
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
-> **Last Updated:** 2026-07-28
+> **Last Updated:** 2026-07-29
 > Authoritative sources: `PLAN.md` (v9 spec, §6/§7/§8/§13/§A/§B/§C/§14/§20/§21/§22), `docs/design-archive/supplement-v7.md` / `supplement-v8.md` / `supplement-v9.md`, `ARCHITECTURE-DELTA.md` (Phase 1 contracts), `IMPLEMENTATION-PLAN.md` (sub-phase build order), `DESIGN.md` (Phase 0 blueprint + Phase 1 additions). This file records *what was actually built* vs those specs.
 
 ## Phase 0 — COMPLETE
@@ -379,6 +379,14 @@ Distilled from review/fix-pass。每条：现象 → Why it matters → How to a
 - **`release.mjs --all`:** exit 0, registry 10 capabilities（三报告 gate 不变）。
 - **`install.mjs --doctor --platform claude-code`:** `healthy: true`, exit 0。
 - **Zero residual:** code-reviewer + code-simplifier 闭环所有发现（含 parseArgs 吞位置参数、effectivenessScan 数据源断链、R31 token-overlap 漏洞、`__FILL_ME__`→`filled` 破 enum、R26 warn 渲染为 FAIL 等）。
+
+## Phase 4 第三刀 — 主菜单补第三方收录入口（SHIPPED 2026-07-29）
+
+**缺口：** `tools/intake.mjs --fetch` / `new-capability.mjs --third-party` 早就能收第三方 git 能力，但 `opsforge menu` 顶层 7 选项里没有任何入口——`cmdNewFlow` 只有"从零创建"两条路（访谈 / 直接脚手架），非技术贡献者根本不知道有 intake。
+
+**修复（方案 B，子菜单加第三项，不动顶层 7 选项）：** `tools/opsforge.mjs` `cmdNewFlow` 追加 `③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）`，路由到新 `cmdIntakeFlow(rl, opts)`（已导出）。交互：上游 git 地址 → kind（agent/skill/mcp/workflow）→ 能力名 → LICENSE SPDX → 负责人 → 调 `intake.mjs intake()` 走完整治理路径（clone SSRF/shell-metachar 拒绝 + 50MB 上限 → LICENSE 允许清单 → `new-capability --third-party` 草稿 → `upstream-ref.json`）。早退守卫：非 https URL / 空 URL / 非法 kind 直接拒（不发网络请求）。失败打印友好提示（LICENSE 允许清单 + 仓库需公开可访问）。顶层菜单文案 "6 选项" → "7 选项" 注释修正。
+
+**测试：** `tools/opsforge.test.mjs` +4（OP14b 菜单 1→3 可达性走非 https 守卫无网络、OP14c 非 https 拒、OP14d 空 URL 取消、OP14e 非法 kind 拒）。bare `node --test` 489 → **496**（+7：本切片 4 + 期间其他已入账 slice 3）；6 gates 全绿（validate/security-scan/eval/release/doctor 不变）。零新 npm 依赖；`cmdMenu` 顶层 7 选项不动（方案 B 核心约束）。
 
 ### Deferred（不阻塞，独立 PR）
 

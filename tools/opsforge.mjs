@@ -2,7 +2,8 @@
 // install flow + discover-from-manifest + 3-report status + feedback jsonl).
 // 载体 A：仓库内 CLI。载体 B：meta-skill/agent（packs/opsforge-meta/）经 install
 // 装入目标平台后 @opsforge 启动本向导逻辑。裸子命令（new/install/status/...）
-// 保留向后兼容；`opsforge menu` 进入顶层 6 选项中文菜单。
+// 保留向后兼容；`opsforge menu` 进入顶层 7 选项中文菜单。Phase 4：菜单分支 1 追加
+// ③收录第三方能力（git → intake）。
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -117,7 +118,7 @@ async function cmdMenuInteractive(args) {
 }
 
 /**
- * cmdMenu(rl, opts) — §2.2 顶层 6 选项中文菜单（首交互）。
+ * cmdMenu(rl, opts) — §2.2 顶层 7 选项中文菜单（首交互）。
  * 循环；非法重问；back/menu/0 回主菜单/退出。
  * @param {readline.Interface} rl
  * @param {{nonInteractive?: boolean, opsforgeHome?: string, workDir?: string}} opts
@@ -165,14 +166,19 @@ export async function cmdMenu(rl, opts = {}) {
 }
 
 /** 菜单分支 1：新建能力。methodology §3：默认路由到 @capability-interviewer
- *  （访谈→蒸馏→跑通五期，LLM 引导式沉淀）；保留 promptNew 直跑 scaffold 作逃生路径（J.12）。 */
+ *  （访谈→蒸馏→跑通五期，LLM 引导式沉淀）；保留 promptNew 直跑 scaffold 作逃生路径（J.12）。
+ *  Phase 4 追加 ③：收录第三方能力（git → intake），走 intake.mjs 治理路径。 */
 async function cmdNewFlow(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
   console.log('--- 新建能力 ---');
   console.log('推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。');
   console.log('  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）');
   console.log('  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）');
-  const ch = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
+  console.log('  ③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）');
+  const ch = (await ask('选 [1-3]（回车=①）: ')).trim() || '1';
+  if (ch === '3') {
+    return await cmdIntakeFlow(rl, opts);
+  }
   if (ch !== '2') {
     console.log('请调出 @capability-interviewer（claude-code 形态）；非 claude-code 平台把');
     console.log('packs/opsforge-meta/skills/opsforge-interview/SKILL.md 内容贴到任意 LLM 跑一遍，');
@@ -190,6 +196,38 @@ async function cmdNewFlow(rl, opts = {}) {
   });
   console.log(`绿 已创建: ${result.destPath}`);
   console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
+}
+
+/** 菜单分支 1③：收录第三方能力（git → intake）。
+ *  走 intake.mjs 完整治理路径：clone（SSRF + shell-metachar 拒绝 + 50MB 上限）
+ *  → LICENSE 允许清单 → new-capability --third-party 草稿 → upstream-ref.json。 */
+export async function cmdIntakeFlow(rl, opts = {}) {
+  const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
+  console.log('--- 收录第三方能力 ---');
+  console.log('把公开 git 仓库里的 skill/agent/mcp/workflow 收进能力仓库（third-party 隔离）。');
+  const repoUrl = (await ask('上游 git 地址（https://...）: ')).trim();
+  if (!repoUrl) { console.log('黄 未填 git 地址，已取消。'); return 1; }
+  if (!/^https:\/\//i.test(repoUrl)) { console.log('黄 只支持 https:// 开头的 git 地址（SSRF 防护）。'); return 1; }
+  const kind = (await ask('能力类型 [agent/skill/mcp/workflow]（回车=agent）: ')).trim() || 'agent';
+  if (!['agent', 'skill', 'mcp', 'workflow'].includes(kind)) {
+    console.log(`黄 不认识的类型 "${kind}"，只支持 agent/skill/mcp/workflow。`); return 1;
+  }
+  const name = (await ask('能力名（英文小写，如 code-reviewer）: ')).trim();
+  if (!name) { console.log('黄 未填能力名，已取消。'); return 1; }
+  const license = (await ask('LICENSE（SPDX，如 MIT/Apache-2.0；回车=MIT）: ')).trim() || 'MIT';
+  const owner = (await ask('负责人（回车=unknown）: ')).trim() || 'unknown';
+  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+  try {
+    const { intake } = await import('./intake.mjs');
+    const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir });
+    console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes} bytes）`);
+    console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
+    return 0;
+  } catch (e) {
+    console.log(`黄 收录失败: ${e.message}`);
+    console.log('提示：LICENSE 需在允许清单内（MIT/Apache-2.0/BSD/ISC 等宽松协议）；仓库需可公开访问。');
+    return 1;
+  }
 }
 
 /** 菜单分支 4：诊断。 */
