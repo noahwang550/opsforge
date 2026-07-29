@@ -1,0 +1,59 @@
+#!/bin/sh
+# .githooks/pre-push — OpsForge 推送前自动小哨兵（§C.4 推送门禁提醒）。
+# 作用：推送到云端仓库前自动做两件小事——
+#   1) 快速体检（结构检查），有红灯就拦下这次推送；
+#   2) 若本次推送包含能力变更（packs/ 下有改动），提醒确认已推送 + 关注 CI。
+# POSIX sh + node，Git Bash 兼容，无 bashisms。
+
+# 找 node（与 install.sh 同一套兜底）
+if command -v node >/dev/null 2>&1; then
+  NODE=node
+elif command -v nodejs >/dev/null 2>&1; then
+  NODE=nodejs
+else
+  echo "黄 未找到 Node.js，跳过推送前体检（建议安装 Node 22+）。" >&2
+  exit 0
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
+# 1) 推送前体检：结构检查全仓库（快，本地静态检查，不跑模型）
+echo "推送前体检：结构检查全仓库（validate --all）..."
+if ! (cd "$REPO_ROOT" && "$NODE" tools/validate.mjs --all >/dev/null 2>&1); then
+  echo "" >&2
+  echo "🔴 推送被拦下：结构检查有红灯。" >&2
+  echo "   请先运行  node tools/validate.mjs --all  看是哪盏红灯，修好再推。" >&2
+  echo "   （急着推且确认无碍时，可用 git push --no-verify 跳过本次检查）" >&2
+  exit 1
+fi
+echo "🟢 结构检查通过。"
+
+# 2) 能力变更提醒：本次推送的提交里若动了 packs/（能力区），提醒一声
+# 用 stdin 里每个 ref 的 old..new 精确判断（git 喂给 pre-push 的标准格式），
+# 全新分支 old 为全零时退回 merge-base 比较。
+CHANGED=""
+BASE=$(git merge-base HEAD "origin/main" 2>/dev/null || echo "")
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  if [ "$LOCAL_SHA" = "0000000000000000000000000000000000000000" ]; then
+    continue  # 删除分支，无内容可比
+  fi
+  if [ "$REMOTE_SHA" != "0000000000000000000000000000000000000000" ]; then
+    RANGE="$REMOTE_SHA..$LOCAL_SHA"
+  elif [ -n "$BASE" ]; then
+    RANGE="$BASE..$LOCAL_SHA"
+  else
+    continue
+  fi
+  HITS=$(git diff --name-only "$RANGE" -- packs/ 2>/dev/null | head -5)
+  if [ -n "$HITS" ]; then
+    CHANGED=$(printf '%s\n%s' "$CHANGED" "$HITS")
+  fi
+done
+if [ -n "$CHANGED" ]; then
+  echo ""
+  echo "📦 提醒：本次推送包含能力变更（packs/ 下有改动）："
+  echo "$CHANGED" | sed '/^$/d' | sort -u | sed 's/^/   - /'
+  echo "   推送后记得看一眼云端 CI 红绿灯；若是新发布的能力，也别忘了让团队成员更新。"
+fi
+
+exit 0

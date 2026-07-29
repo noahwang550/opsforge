@@ -11,7 +11,8 @@
     "validate": "node tools/validate.mjs --all",
     "new": "node tools/new-capability.mjs",
     "test": "node --test",
-    "lint:md": "markdownlint '**/*.md'"
+    "lint:md": "markdownlint '**/*.md'",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "ajv": "^8.12.0",

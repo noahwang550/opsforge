@@ -196,6 +196,12 @@ async function cmdNewFlow(rl, opts = {}) {
   });
   console.log(`绿 已创建: ${result.destPath}`);
   console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
+  printPushReminder();
+}
+
+/** 能力创建/收录收尾统一提醒：别忘了推送云端仓库（B2 会话级提醒）。 */
+export function printPushReminder() {
+  console.log('📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。');
 }
 
 /** 菜单分支 1③：收录第三方能力（git → intake）。
@@ -222,6 +228,7 @@ export async function cmdIntakeFlow(rl, opts = {}) {
     const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir });
     console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes} bytes）`);
     console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
+    printPushReminder();
     return 0;
   } catch (e) {
     console.log(`黄 收录失败: ${e.message}`);
@@ -290,6 +297,7 @@ export async function cmdWizard(rl, opts = {}) {
   console.log(`下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后运行:`);
   console.log(`  node tools/validate.mjs ${result.destPath}`);
   console.log(`  opsforge status ${result.destPath}`);
+  printPushReminder();
   return 0;
 }
 

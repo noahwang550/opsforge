@@ -1,5 +1,7 @@
 name: opsforge-validate
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
 permissions:
@@ -40,4 +42,5 @@ jobs:
           node-version-file: '.nvmrc'
       - run: npm ci
       - name: Adapter loads for ${{ matrix.platform }}
-        run: node -e "import('./adapters/${{ matrix.platform }}/adapter.mjs').then(m => { if(!m.adapter) process.exit(1); console.log('adapter ok: ${{ matrix.platform }} tier=' + m.adapter.tier()); })"
+        run: |
+          node -e "import('./adapters/${{ matrix.platform }}/adapter.mjs').then(m => { if(!m.adapter) process.exit(1); console.log('adapter ok: ${{ matrix.platform }} tier=' + m.adapter.tier()); })"

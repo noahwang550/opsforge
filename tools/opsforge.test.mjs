@@ -285,6 +285,22 @@ test('OP14e cmdIntakeFlow rejects invalid kind', async () => {
   assert.equal(code, 1);
 });
 
+// OP14f printPushReminder: session-level push reminder prints Chinese guidance (B2).
+test('OP14f printPushReminder prints push-to-remote reminder', async () => {
+  const { printPushReminder } = await import('./opsforge.mjs');
+  const lines = [];
+  const orig = console.log;
+  console.log = (s) => lines.push(String(s));
+  try {
+    printPushReminder();
+  } finally {
+    console.log = orig;
+  }
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes('推送'), 'reminder should mention 推送');
+  assert.ok(lines[0].includes('云端仓库'), 'reminder should mention 云端仓库');
+});
+
 // OP15 promptInstallFlow: 5 steps — platform/method/browse/deps/confirm.
 test('OP15 promptInstallFlow collects 5-step install input', async () => {
   const tmp = mkTmp();

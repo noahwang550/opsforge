@@ -37,4 +37,6 @@
 
 16. **工程字段勿改**：`id` / `version` / `kind` / `pack` / `entrypoint` / `tests` / `changelog` / `source.origin` 由脚手架预填；`engineering_fields_untampered` 校验与预填值一致。
 
+17. **能力创建 / 收录 / 发布后，主动提醒推送云端仓库**。只留在本地的能力团队看不到（教训：2026-07-29 sy-automl-mcp 发布完差点忘了推）。双层提醒机制已就位：`.githooks/pre-push` 推送前自动跑 `validate --all`（红灯拦截）+ packs/ 变更提醒；`opsforge.mjs` 创建/收录流程收尾打印 `printPushReminder()`。代理在走完发布流程后也应口头提醒一次。
+
 如不确定，跑 `node tools/validate.mjs <path>`，报错消息即权威指引。
