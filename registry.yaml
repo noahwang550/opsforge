@@ -1,4 +1,11 @@
 capabilities:
+  data-team.data-quality-profiler:
+    current: 0.2.0
+    history:
+      - version: 0.2.0
+        released_at: '2026-08-06'
+        commit: 95bf169
+    changelog_index: packs/data-team/skills/data-quality-profiler/CHANGELOG.md
   marketing-team.copywriter:
     current: 1.0.0
     history:
@@ -83,3 +90,10 @@ capabilities:
         released_at: '2026-08-06'
         commit: 77ffc3a
     changelog_index: packs/third-party/skills/marketingskills/CHANGELOG.md
+  third-party.member-recall:
+    current: 0.1.0
+    history:
+      - version: 0.1.0
+        released_at: '2026-08-06'
+        commit: 95bf169
+    changelog_index: packs/third-party/skills/member-recall/CHANGELOG.md

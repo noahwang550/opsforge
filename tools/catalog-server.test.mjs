@@ -21,9 +21,9 @@ async function withServer(fn) {
 
 test('catalog server serves health, summary and detail APIs', async () => withServer(async (base) => {
   const health = await fetch(`${base}/healthz`).then((response) => response.json());
-  assert.deepEqual(health, { status: 'ok', count: 11, generatedAt: '2026-08-03T00:00:00.000Z' });
+  assert.deepEqual(health, { status: 'ok', count: 14, generatedAt: '2026-08-03T00:00:00.000Z' });
   const summary = await fetch(`${base}/api/catalog`).then((response) => response.json());
-  assert.equal(summary.capabilities.length, 11);
+  assert.equal(summary.capabilities.length, 14);
   assert.equal('qualityChecks' in summary.capabilities[0], false);
   assert.ok(summary.filters.scopes.some((scope) => scope.id === 'general'));
   const detail = await fetch(`${base}/api/capabilities/opsforge-meta.opsforge`).then((response) => response.json());

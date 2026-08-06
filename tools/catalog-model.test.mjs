@@ -6,7 +6,7 @@ const REPO = process.cwd();
 
 test('catalog exposes only released capabilities and public fields', async () => {
   const snapshot = await buildCatalogSnapshot({ repoRoot: REPO, now: new Date('2026-08-03T00:00:00Z') });
-  assert.equal(snapshot.count, 11);
+  assert.equal(snapshot.count, 14);
   assert.ok(snapshot.capabilities.every((item) => item.id && item.name && item.kindLabel));
   assert.ok(snapshot.capabilities.every((item) => !('owner' in item) && !('dir' in item) && !('customer' in item)));
   assert.ok(snapshot.capabilities.some((item) => item.source.key === 'example'));
