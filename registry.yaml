@@ -60,14 +60,14 @@ capabilities:
     history:
       - version: 1.0.0
         released_at: '2026-08-06'
-        commit: '4291196'
+        commit: bc39717
     changelog_index: packs/opsforge-meta/skills/opsforge-interview/CHANGELOG.md
   opsforge-meta.opsforge-wizard:
     current: 1.0.0
     history:
       - version: 1.0.0
         released_at: '2026-08-06'
-        commit: '4291196'
+        commit: bc39717
     changelog_index: packs/opsforge-meta/skills/opsforge-wizard/CHANGELOG.md
   third-party.sy-automl-mcp:
     current: 0.1.0

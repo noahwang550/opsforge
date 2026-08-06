@@ -175,16 +175,20 @@ test('BT5 bootstrap gracefully handles missing opsforge-meta caps', async () => 
   assert.ok(r.copied.length >= 4, 'runtime files still copied');
 });
 
-// BT6: bootstrap against the REAL repo installs the 3 opsforge-meta caps (eat own dogfood).
+// BT6: bootstrap against the REAL repo installs the 6 opsforge-meta caps (eat own dogfood).
 test('BT6 bootstrap installs real opsforge-meta caps from the repo', async () => {
   const home = mkTmp();
   fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   await withHome(home, async () => {
     const r = await bootstrap({ platform: 'claude-code', repoRoot: REPO_ROOT, opsforgeHome: home });
-    assert.equal(r.installed.length, 3, 'should install all 3 meta caps');
+    assert.equal(r.installed.length, 6, 'should install all 6 meta caps');
     assert.ok(fs.existsSync(path.join(home, '.claude', 'agents', 'opsforge.md')), 'real opsforge agent');
     assert.ok(fs.existsSync(path.join(home, '.claude', 'agents', 'opsforge-installer.md')), 'real installer agent');
     assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'opsforge-wizard', 'SKILL.md')), 'real wizard skill');
+    // Phase 4 补装：访谈员 / 蒸馏器 / 纯 prompt 访谈脚本，修复 @opsforge option ① 委托链断
+    assert.ok(fs.existsSync(path.join(home, '.claude', 'agents', 'capability-interviewer.md')), 'real interviewer agent');
+    assert.ok(fs.existsSync(path.join(home, '.claude', 'agents', 'capability-distiller.md')), 'real distiller agent');
+    assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'opsforge-interview', 'SKILL.md')), 'real interview pure-prompt skill');
     // runtime subtree + runtime-root from real repo
     assert.ok(fs.existsSync(path.join(home, 'runtime', 'tools', 'opsforge-runtime.mjs')), 'real opsforge-runtime.mjs copied');
     assert.ok(fs.existsSync(path.join(home, 'runtime', 'tools', 'paths.mjs')), 'real paths.mjs copied');

@@ -16,11 +16,17 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 载体 B 的三个 meta-capability（agent 菜单 + skill 向导 + agent 安装器）。
+// 载体 B 的六个 meta-capability：agent 菜单 + skill 向导 + agent 安装器
+// + 能力创建流水线的访谈员 / 蒸馏器 / 纯 prompt 访谈脚本（Tier 2/3）。
+// 后三者必须一并自举，否则 @opsforge agent 在 option ① 委托 @capability-interviewer
+// 时找不到 CC subagent，退化为 LLM 自由叙述并丢分支（P0-A 反 prompt drift 的漏网之鱼）。
 const DEFAULT_META_CAPS = [
   'opsforge-meta.opsforge',
   'opsforge-meta.opsforge-wizard',
   'opsforge-meta.opsforge-installer',
+  'opsforge-meta.capability-interviewer',
+  'opsforge-meta.capability-distiller',
+  'opsforge-meta.opsforge-interview',
 ];
 
 // 复制到 ~/.opsforge/runtime/ 保留相对路径的 runtime 子树（零 bare-dep，可独立加载）。

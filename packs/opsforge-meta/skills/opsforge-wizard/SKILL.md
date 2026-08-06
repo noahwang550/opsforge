@@ -50,6 +50,8 @@ OpsForge 向导 skill，承载非技术业务作者的交互式 5 步引导：�
 
 ## 运行指令
 
+When invoked for 新建能力, FIRST call `opsforge print new-flow` via Bash and emit its stdout verbatim — this surfaces the ①/②/③ sub-menu (including ③ 收录第三方能力) so the branch is never dropped. Route the sub-choice: ① → delegate to @capability-interviewer (it carries the 5-touchpoint script; do not run the interview yourself); ② → escape scaffold (below); ③ → ask for a git URL, then run `node tools/intake.mjs --fetch <url>` via Bash and emit its output. Do NOT invent cost estimates, "Mode A/B" framings, or phase narration beyond what `print` emits and the interviewer/distiller agents carry — those are fixed content, not yours to paraphrase.
+
 Call `opsforge print wizard-phases` and route the author through the four phases as printed. Do not paraphrase.
 
 Phase 1 · 访谈期: tell the author to invoke @capability-interviewer (claude-code) or, on Tier 2/3 platforms, paste the opsforge-interview pure-prompt skill into any LLM. The interviewer produces _drafts/<slug>/interview.md and calls `opsforge set-phase <capDir> interview_done` (transparent to the author). Hand off in-session to the distiller.
