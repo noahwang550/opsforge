@@ -1,7 +1,7 @@
-# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合)
+# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合 + capability-creation 方法论 + 主菜单补第三方收录 + 三痛点优化 + 能力目录触达+一键提交)
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
-> **Last Updated:** 2026-07-29
+> **Last Updated:** 2026-08-06
 > Authoritative sources: `PLAN.md` (v9 spec, §6/§7/§8/§13/§A/§B/§C/§14/§20/§21/§22), `docs/design-archive/supplement-v7.md` / `supplement-v8.md` / `supplement-v9.md`, `ARCHITECTURE-DELTA.md` (Phase 1 contracts), `IMPLEMENTATION-PLAN.md` (sub-phase build order), `DESIGN.md` (Phase 0 blueprint + Phase 1 additions). This file records *what was actually built* vs those specs.
 
 ## Phase 0 — COMPLETE
@@ -519,6 +519,21 @@ Distilled from the Phase 3.6 fix-pass (tdd-guide + e2e-runner + code-reviewer + 
 - **n. "计时断言要留机器抖动余量"**：`TR_par1` 断言并行耗时 <200ms，本机抖到 207ms 挂——纯计时精度断言在 CI/异机必 flaky。**教训：计时断言的阈值应远低于串行基线（280ms vs 300ms+）证明"并行更快"即可，不要逼近单 case 耗时做精度断言。**
 
 
+## Phase 4 第五刀（能力目录触达 + 一键提交到能力仓）SHIPPED 2026-08-06
+
+5-agent 流水线（业务用户评审→architect→tdd-guide→e2e-runner→code-reviewer 修复）针对 dogfood 暴露的两个触达痛点交付 A1→A2→B1→B2→AB 五 slice，**守住 10 条硬不变量**（零新 npm 依赖 / additionalProperties:false / registry auto-gen / skeleton_guard 两处不动 / R16–R31 不弱化 + R32 同级独立 / §C.1 / 无 Go / SSRF 全套 / Windows argv / release gate 三报告不动）。
+
+- **Pain A（能力目录触达）**：(A1) 新 `tools/opsforge-catalog-launcher.mjs` `openInBrowser` 跨平台 argv spawn（`new URL` 校验 hostname 必须 `127.0.0.1`，失败只打印业务话不报错）+ `cmdCatalogFlow`（`port:0` OS 分配 + `server.address().port` 读取 + `try/finally` + `server.close()` + "按回车回主菜单"非 Ctrl+C）+ `PRINT_TOPICS['catalog-hint']`；(A2) `promptInstallFlow` 改 `opts.out` 注入 + 深链可见性规则（server 在跑→可点击链接；未跑→业务指引"主菜单选 8 可看详情"不裸露 URL）+ `cmdDiscover`/`inventory.mjs renderDiscoverAll` 每行加触达指引 + `cmdNewFlow`/`cmdIntakeFlow`/`cmdWizard` 末尾调 `printSubmitHint()+printCatalogHint()` + `tools/opsforge-wording.test.mjs` WC1-WC4 文案守则可执行断言防回潮。
+- **Pain B（一键提交到能力仓）**：(B1) 新 `tools/submit.mjs`（`parseGitRemote` SSH+HTTPS / `resolveGitRemote` execFileSync argv / `readSubmitToken`/`writeSubmitToken` 0600 / `assertDraftUnder` 路径穿越拒绝 / `runLocalPreflight` 动态 import validate+security-scan+test-runner 传 `runner:'static-only'` / `callGithubApi` host 硬编码 `api.github.com` Bearer 头 + 401/403 业务话）+ `tools/paths.mjs` `listDrafts`/`draftsRoots`/`submitTokenPath`（正则提取 kind 不引 js-yaml，守 bootstrap 零依赖）+ `cmdSubmitFlow` 全程业务话文案（贡献码首次引导"找团队管理员领贡献码粘贴一次"）+ `PRINT_TOPICS['submit-flow'/'submit-hint']`；(B2) R32 `scanRepoForSubmitSecrets` 独立函数扫 `tools/`+`packs/`+`templates/`+`web/`+`docs/`（`github_pat_` regex 加到 SECRET_PATTERNS，不进 per-cap `scan(capDir)` 返回值，守 security-report.json 结构）+ `submit.mjs` 同名分支 force-update + 401/403 + `fetchPrReviewSummary` 业务话摘要 + `.gitignore` 加 `submit-token.json` + `docs/contributing/contributor-code-guide.md`（管理员向）。
+- **(AB)** `web/catalog/app.js` 加"社区贡献"徽章（读 `item.source.key==='third-party'`，不动 schema）+ `templates/readme-template.zh.md` 加"如何发布"段。
+
+设计文档 `docs/design-archive/catalog-reach-and-one-click-submit-proposal.md` + `catalog-reach-and-submit-architecture.md`。bare `node --test` 532 → **574**（A1 +11 / A2 +4 / B1 +16 / B2 +8 / AB +0 / review 修复 +3 CL5/CL6/R32-6）；6 gates 全绿（14 capabilities）；零新 npm 依赖。
+
+### Lessons learned（能力目录触达+一键提交会话）
+
+- **o. "R32 仓库级规则接入 `--all` 时必须在 `process.exit` 之前，否则成死代码"**：R32 `scanRepoForSubmitSecrets` 最初写在 `security-scan.mjs main()` 的 `--all` 分支末尾，但 `main()` 在其后 `process.exit(0)`，导致 R32 永不执行——单元测试只测 `scanRepoForSubmitSecrets()` 函数返回值，没测 `--all` CLI argv 路径真的调到它。**教训：加任何 R-rule（尤其仓库级而非 per-cap）后，必须加 CLI-argv 集成测试（spawn `node tools/security-scan.mjs --all` 验证输出含 R32 结果），不只测函数 API；接 `--all` 时必须在 `process.exit` 之前调用。** 与既有记忆 `test-cli-argv-path-not-just-function` + `validate-new-rule-run-full-tests` 同源。
+- **p. "`cmd /c start` 是 shell 调用，URL 须双引号包裹防 `&`/`|` 逃逸，仅 hostname 校验不够"**：Windows `start` 经 `cmd /c` 解释 URL，若 URL 含 `&`/`|` 会被当 shell 元字符。`openInBrowser` 仅校验 hostname 是 `127.0.0.1` 不够——业务侧若将来拼 query string 进 URL 就会逃逸。**教训：跨平台 spawn 浏览器时，URL 须用 `new URL()` 解析后重组 + 双引号包裹再传 `cmd /c start ""`；不要假设 hostname 白名单就够。**
+- **q. "业务用户文案守则须落成可执行断言（WC1-WC4）防回潮，文档口号没用"**：深链可见性规则（server 未跑只打印业务指引不裸露 URL）若只写进 `contributor-code-guide.md` 不加测试，下次 agent 改 `cmdCatalogFlow` 就会回退。**教训：任何面向非技术用户的文案/可见性规则必须写成可执行断言（`opsforge-wording.test.mjs` WC1-WC4），让 CI 挡回潮；纯文档口号守不住。**
 
 **Phase 4 第一刀（skill-up 融合）SHIPPED 2026-07-27。** 其余 governance flywheel 项仍 pending：
 

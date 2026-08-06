@@ -322,6 +322,7 @@ export function renderDiscoverAll(inv /*, opts */) {
           return `${p.platform}(${tier}${unmet})`;
         }).join(' · ');
         lines.push(`    平台: ${plat || '-'}`);
+        lines.push('    （主菜单选 8 可看详情）');
         lines.push('    ----------------------------------------');
       }
       lines.push('');

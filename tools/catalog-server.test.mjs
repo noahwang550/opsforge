@@ -48,3 +48,15 @@ test('catalog server refuses an empty startup snapshot', async () => {
     /no released capabilities/,
   );
 });
+
+// CS4 port:0 + server.address().port 读取（A1 技术修正点：cmdCatalogFlow 自行读 port）。
+test('CS4 port:0 assigns OS port readable via server.address().port', async () => {
+  const snapshot = await buildCatalogSnapshot({ repoRoot: process.cwd(), now: new Date('2026-08-03T00:00:00Z') });
+  const { server } = await startCatalogServer({ snapshot, webRoot: webFixture(), port: 0 });
+  try {
+    const port = server.address().port;
+    assert.ok(Number.isInteger(port) && port > 0, 'port must be a positive integer assigned by OS');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

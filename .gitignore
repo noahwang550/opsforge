@@ -25,3 +25,6 @@ Thumbs.db
 **/validation-report.json
 **/security-report.json
 **/eval-report.json
+
+# 贡献码（B2）：本文件绝不进 git，贡献码只存 ~/.opsforge/submit-token.json
+submit-token.json

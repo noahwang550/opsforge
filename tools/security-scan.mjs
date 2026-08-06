@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SECRET_PATTERNS = [
   { regex: /AKIA[0-9A-Z]{16}/, rule: 'hardcoded_secret', label: 'AWS access key' },
   { regex: /ghp_[A-Za-z0-9]{36}/, rule: 'hardcoded_secret', label: 'GitHub PAT' },
+  { regex: /github_pat_[A-Za-z0-9_]{82,}/, rule: 'hardcoded_secret', label: 'GitHub fine-grained PAT (贡献码)' },
   { regex: /sk-[a-zA-Z0-9]{20,}/, rule: 'hardcoded_secret', label: 'API secret (sk-)' },
   { regex: /-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/, rule: 'hardcoded_secret', label: 'private key block' },
   { regex: /(mongodb|postgres|mysql|redis):\/\/[^\s"']+:[^\s"']+@/, rule: 'hardcoded_secret', label: 'connection string with credentials' },
@@ -182,6 +183,42 @@ export function scan(capDir) {
   };
 }
 
+/**
+ * scanRepoForSubmitSecrets(repoRoot) — R32 仓库级独立函数（B2）。
+ * 扫 tools/ + packs/ + templates/ + web/ + docs/ 找贡献码/PAT 字面。
+ * 不进 per-cap scan(capDir) 返回值（守住 security-report.json 结构 + additionalProperties:false）。
+ * @param {string} repoRoot
+ * @returns {{verdict: 'pass'|'block', findings: Array, rule: string}}
+ */
+export function scanRepoForSubmitSecrets(repoRoot) {
+  const findings = [];
+  const scanDirs = ['tools', 'packs', 'templates', 'web', 'docs'];
+  const CONTRIBUTION_CODE_RE = /github_pat_[A-Za-z0-9_]{82,}/;
+  for (const sub of scanDirs) {
+    const dir = path.join(repoRoot, sub);
+    if (!fs.existsSync(dir)) continue;
+    for (const f of walkFiles(dir)) {
+      const content = fs.readFileSync(f.full, 'utf8');
+      const lines = content.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        if (CONTRIBUTION_CODE_RE.test(lines[i])) {
+          findings.push({
+            rule: 'R32_submit_no_secret_in_token_file',
+            severity: 'high',
+            evidence: `${f.rel}:${i + 1}: 贡献码字面出现在仓库内`,
+            status: 'block',
+          });
+        }
+      }
+    }
+  }
+  return {
+    verdict: findings.length > 0 ? 'block' : 'pass',
+    findings,
+    rule: 'R32_submit_no_secret_in_token_file',
+  };
+}
+
 /** CLI: `node tools/security-scan.mjs <capDir> | --all` */
 export function main() {
   const argv = process.argv.slice(2);
@@ -207,6 +244,13 @@ export function main() {
           console.log(`       ${f.rule}: ${f.evidence}`);
         }
       }
+      // B2 R32: repo-level submit-secret scan appended to --all (independent of per-cap).
+      // 必须在 process.exit 之前——否则 R32 是死代码，贡献码字面泄露不会被 gate 拦。
+      const repoScan = scanRepoForSubmitSecrets(process.cwd());
+      for (const f of repoScan.findings) {
+        console.log(`BLOCK  ${f.rule}: ${f.evidence}`);
+      }
+      if (repoScan.verdict === 'block') allPass = false;
       process.exit(allPass ? 0 : 1);
     })();
   } else {
