@@ -144,6 +144,31 @@ function qualityLight(cap) {
   return '黄';
 }
 
+function qualityReports(cap) {
+  const readVerdict = (name) => {
+    const report = readJsonOrNullSync(path.join(cap.dir, name));
+    return report && typeof report.verdict === 'string' ? report.verdict : 'missing';
+  };
+  return {
+    validation: readVerdict('validation-report.json'),
+    security: readVerdict('security-report.json'),
+    eval: readVerdict('eval-report.json'),
+  };
+}
+
+/**
+ * P1-B: read a single field from upstream-ref.json (intake_scope, install_hint).
+ * Returns null when the file or field is absent (vendored/original capabilities
+ * have no upstream-ref.json). Reused from paths.mjs readJsonOrNullSync.
+ * @param {string} capDir
+ * @param {string} field
+ * @returns {any|null}
+ */
+function readUpstreamRefField(capDir, field) {
+  const ref = readJsonOrNullSync(path.join(capDir, 'upstream-ref.json'));
+  return (ref && ref[field] !== undefined) ? ref[field] : null;
+}
+
 /**
  * buildInventory(opts) — 派生能力清单。
  * @param {{repoRoot?: string, includeDrafts?: boolean}} opts
@@ -162,6 +187,7 @@ export async function buildInventory(opts = {}) {
     if (!cap.yaml) continue;
     const id = cap.yaml.id;
     const isReleased = releasedIds.has(id);
+    const registryEntry = registry.capabilities?.[id] || null;
     const state = detectCapState(cap.dir, isReleased);
     if (state === 'draft' && !opts.includeDrafts) continue;
     const { scope, brand } = classifyScope(cap.dir);
@@ -187,6 +213,12 @@ export async function buildInventory(opts = {}) {
       scenarioTag,
       platformSupport,
       light,
+      qualityReports: qualityReports(cap),
+      dependsOn: Array.isArray(cap.yaml.depends_on) ? cap.yaml.depends_on : [],
+      sourceOrigin: cap.yaml.source?.origin || 'original',
+      releasedAt: registryEntry?.history?.find((item) => item.version === registryEntry.current)?.released_at || null,
+      intakeScope: readUpstreamRefField(cap.dir, 'intake_scope'),
+      installHint: readUpstreamRefField(cap.dir, 'install_hint'),
       state,
       scope,
       brand,

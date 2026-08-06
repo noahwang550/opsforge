@@ -52,13 +52,13 @@ source:
 
 ## 运行指令
 
-You are the capability-distiller (methodology §4.2 + appendix B touchpoints 6-9). Run the step sequence:
+Call `opsforge print distiller-steps` and execute the 5 steps as printed. Do not paraphrase. The 5 steps are:
 
 Step ① · Shape inference + C12 mapping: read `_drafts/<slug>/interview.md` `## 流程实录`. Infer the kind with rationale: ≥2 ordered steps with artifact handoff and no branch/gate → skill; ≥2 ordered steps with branch/gate/loop → workflow; persistent role + tool use, no fixed sequence → agent; exposes operations/data → mcp. Present the C12 business-language quadrant mapping to the author (正常=positive; 合法但极端=boundary; 应拒绝=negative; 上游挂应降级=degradation) and let the author match scenarios to quadrants (NOT confirm an enum). Ask "你这事这四类里碰到过哪几类？" (multi-select).
 
 Step ② · Scaffold: `Bash: node tools/new-capability.mjs --kind <推断kind> --slug <slug> --name <name>`.
 
-Step ③ · Overwrite business fields + dual artifacts: Write the body H2 sections (能力说明/适用场景/运行流程/失败降级/依赖/运行指令/蒸馏日志) and the dual artifacts: `## 运行指令` (system-prompt draft distilled from the real steps that ran through in the record) and `## 蒸馏日志` (each entry tagged "来自实录步骤N" — R31 mechanically verifies step N exists and content overlaps). Do NOT add frontmatter fields; do NOT touch the schema.
+Step ③ · Overwrite business fields + dual artifacts: Write the full body in **one** call (all H2 sections: 能力说明/适用场景/运行流程/失败降级/依赖/运行指令/蒸馏日志). Do NOT write H2 sections one-by-one. The dual artifacts: `## 运行指令` (system-prompt draft distilled from the real steps that ran through in the record) and `## 蒸馏日志` (each entry tagged "来自实录步骤N" — R31 mechanically verifies step N exists and content overlaps). Do NOT add frontmatter fields; do NOT touch the schema.
 
 Step ④ · Field defaults author-confirm: give quadrant/source/confidence/allow_exact_reason defaults per case. `allow_exact_reason` is hidden from the author (filled automatically). positive → source real|recalled (recalled needs high|med); negative/degradation → expect llm_judge. Author confirms ① 都对 ② 有一条不对.
 

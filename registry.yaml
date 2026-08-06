@@ -3,76 +3,76 @@ capabilities:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-23'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/marketing-team/agents/copywriter/CHANGELOG.md
   marketing-team.bi-connector:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-23'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/marketing-team/mcps/bi-connector/CHANGELOG.md
   marketing-team.activity-summary:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-23'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/marketing-team/skills/activity-summary/CHANGELOG.md
   marketing-team.campaign-retrospect:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-23'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/marketing-team/workflows/campaign-retrospect/CHANGELOG.md
   opsforge-meta.capability-distiller:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-28'
-        commit: eb6c1f8
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/agents/capability-distiller/CHANGELOG.md
   opsforge-meta.capability-interviewer:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-28'
-        commit: eb6c1f8
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/agents/capability-interviewer/CHANGELOG.md
   opsforge-meta.opsforge:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-24'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/agents/opsforge/CHANGELOG.md
   opsforge-meta.opsforge-installer:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-24'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/agents/opsforge-installer/CHANGELOG.md
   opsforge-meta.opsforge-interview:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-28'
-        commit: eb6c1f8
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/skills/opsforge-interview/CHANGELOG.md
   opsforge-meta.opsforge-wizard:
     current: 1.0.0
     history:
       - version: 1.0.0
-        released_at: '2026-07-24'
-        commit: unknown
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/opsforge-meta/skills/opsforge-wizard/CHANGELOG.md
   third-party.sy-automl-mcp:
     current: 0.1.0
     history:
       - version: 0.1.0
-        released_at: '2026-07-29'
-        commit: 139ea95
+        released_at: '2026-08-06'
+        commit: '4291196'
     changelog_index: packs/third-party/mcps/sy-automl-mcp/CHANGELOG.md

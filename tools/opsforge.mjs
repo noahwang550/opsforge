@@ -17,6 +17,72 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLATFORMS = ['claude-code', 'cursor', 'codex', 'cline', 'dify'];
 
 /**
+ * PRINT_TOPICS — 固定内容单一真相源（P0-A）。
+ * 既有 cmdMenu/cmdNewFlow/cmdWizard 等改为读这里的字符串再 console.log，
+ * 与 `print` 子命令共用同一源（避免双源真相，消除 prompt drift）。
+ * report-templates/*.zh.md 仍由 report-renderer.mjs 读（print 复用同一模板文件）。
+ */
+const PRINT_TOPICS = {
+  'menu': [
+    '========================================',
+    '  OpsForge 能力工坊',
+    '========================================',
+    '你想做什么？请输入序号：',
+    '  1) 新建一个能力（从零开始写）',
+    '  2) 安装已有能力到我的平台',
+    '  3) 我的能力（已装能力 + 触发方式）',
+    '  4) 诊断问题（已装的能力出毛病了）',
+    '  5) 查看能力报告（流转进度 / 体检）',
+    '  6) 反馈（给能力打分）',
+    '  7) 浏览仓库全部能力（清单 + 适用场景）',
+    '  0) 退出',
+    '----------------------------------------',
+  ].join('\n'),
+  'new-flow': [
+    '--- 新建能力 ---',
+    '推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。',
+    '  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）',
+    '  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）',
+    '  ③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）',
+  ].join('\n'),
+  'wizard-routing': [
+    'OpsForge 向导 — 引导式创建能力',
+    '推荐先走访谈员 @capability-interviewer（五期：访谈→蒸馏→跑通→迭代），LLM 引导式沉淀。',
+    '  ① 调出 @capability-interviewer  ② 直接脚手架（逃生路径）',
+  ].join('\n'),
+  'push-reminder': '📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。',
+  'error-recovery': '[黄] <msg>\n可能原因：<reason>\n下一步：<next-step>\n已返回主菜单。',
+  'distiller-steps': 'Step ① · Shape inference + C12 mapping: read `_drafts/<slug>/interview.md` `## 流程实录`. Infer the kind with rationale.\nStep ② · Scaffold: `Bash: node tools/new-capability.mjs --kind <推断kind> --slug <slug> --name <name>`.\nStep ③ · Overwrite business fields + dual artifacts: Write the full body in **one** call (all H2 sections + dual artifacts).\nStep ④ · Field defaults author-confirm: give quadrant/source/confidence/allow_exact_reason defaults per case.\nStep ⑤ · `Bash: opsforge set-phase <capDir> distill_done`.',
+  'wizard-phases': 'Phase 1 · 访谈期: invoke @capability-interviewer (claude-code) or paste opsforge-interview pure-prompt skill (Tier 2/3). Produces _drafts/<slug>/interview.md.\nPhase 2 · 蒸馏期: invoke @capability-distiller. Reads interview.md, infers kind, scaffolds, overwrites body + dual artifacts, calls set-phase distill_done.\nPhase 3 · 跑通期: run structure gate + run-light gate (test-runner.mjs dry-run ≥2 cases). Render two-tier light via report-renderer.mjs.\nPhase 4 · 迭代期: passive evolve trigger (feedback≤2 or 3rd discover/doctor call → suggest opsforge evolve).',
+};
+
+/**
+ * cmdPrint(args, opts) — `opsforge print <topic>` emit 固定内容到 stdout（P0-A）。
+ * 单一真相源：PRINT_TOPICS map。既有 cmdMenu/cmdNewFlow 等改读同一常量，
+ * 避免双源真相，消除 LLM 自由叙述 prompt drift（如 ③ 第三方分支丢失）。
+ * @param {string[]} args  argv.slice(1) after 'print'; args[0] = topic
+ * @param {{out?: (s: string) => void}} opts  opts.out 默认 console.log
+ * @returns {Promise<number>} 0=success, 1=unknown topic, 2=missing topic arg
+ */
+export async function cmdPrint(args = [], opts = {}) {
+  const out = opts.out || console.log;
+  const topic = args[0];
+  if (!topic) {
+    console.error('usage: opsforge print <topic>');
+    console.error(`available: ${Object.keys(PRINT_TOPICS).join(', ')}`);
+    return 2;
+  }
+  const content = PRINT_TOPICS[topic];
+  if (!content) {
+    console.error(`opsforge print: unknown topic "${topic}"`);
+    console.error(`available: ${Object.keys(PRINT_TOPICS).join(', ')}`);
+    return 1;
+  }
+  out(content);
+  return 0;
+}
+
+/**
  * detectPlatform(opts) — 自动探测目标平台（修审计 #4：去硬编码 claude-code）。
  * 遍历 5 个平台 config dir（按 opts.opsforgeHome 或 resolveHome() 解析），返回首个存在的；
  * 均不中则默认 claude-code。MAJOR 2: 修 OP19 空转——改成 lazy 解析（不再用模块级常量），
@@ -66,9 +132,10 @@ export async function main(argv = process.argv.slice(2)) {
       case 'evals-export': return await cmdEvalsExport(argv.slice(1));
       case 'benchmark': return await cmdBenchmark(argv.slice(1));
       case 'set-phase': return await cmdSetPhase(argv.slice(1));
+      case 'print': return await cmdPrint(argv.slice(1));
       default:
         console.error(`opsforge: unknown command "${cmd}"`);
-        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard, evolve, evals-import, evals-export, benchmark, set-phase');
+        console.error('available: menu, new, install, status, doctor, discover, report, feedback, wizard, evolve, evals-import, evals-export, benchmark, set-phase, print');
         return 2;
     }
   } catch (e) {
@@ -126,21 +193,7 @@ async function cmdMenuInteractive(args) {
  */
 export async function cmdMenu(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
-  const menu = () => console.log([
-    '========================================',
-    '  OpsForge 能力工坊',
-    '========================================',
-    '你想做什么？请输入序号：',
-    '  1) 新建一个能力（从零开始写）',
-    '  2) 安装已有能力到我的平台',
-    '  3) 我的能力（已装能力 + 触发方式）',
-    '  4) 诊断问题（已装的能力出毛病了）',
-    '  5) 查看能力报告（流转进度 / 体检）',
-    '  6) 反馈（给能力打分）',
-    '  7) 浏览仓库全部能力（清单 + 适用场景）',
-    '  0) 退出',
-    '----------------------------------------',
-  ].join('\n'));
+  const menu = () => console.log(PRINT_TOPICS['menu']);
   while (true) {
     menu();
     const choice = (await ask('请选择 [0-7]: ')).trim();
@@ -170,11 +223,7 @@ export async function cmdMenu(rl, opts = {}) {
  *  Phase 4 追加 ③：收录第三方能力（git → intake），走 intake.mjs 治理路径。 */
 async function cmdNewFlow(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
-  console.log('--- 新建能力 ---');
-  console.log('推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。');
-  console.log('  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）');
-  console.log('  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）');
-  console.log('  ③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）');
+  console.log(PRINT_TOPICS['new-flow']);
   const ch = (await ask('选 [1-3]（回车=①）: ')).trim() || '1';
   if (ch === '3') {
     return await cmdIntakeFlow(rl, opts);
@@ -201,7 +250,7 @@ async function cmdNewFlow(rl, opts = {}) {
 
 /** 能力创建/收录收尾统一提醒：别忘了推送云端仓库（B2 会话级提醒）。 */
 export function printPushReminder() {
-  console.log('📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。');
+  console.log(PRINT_TOPICS['push-reminder']);
 }
 
 /** 菜单分支 1③：收录第三方能力（git → intake）。
@@ -222,11 +271,14 @@ export async function cmdIntakeFlow(rl, opts = {}) {
   if (!name) { console.log('黄 未填能力名，已取消。'); return 1; }
   const license = (await ask('LICENSE（SPDX，如 MIT/Apache-2.0；回车=MIT）: ')).trim() || 'MIT';
   const owner = (await ask('负责人（回车=unknown）: ')).trim() || 'unknown';
+  // P1-A: reference-scope intake (only store git URL, no clone) is the default.
+  const scopeCh = (await ask('收录方式 ① 完整克隆（vendored，克隆到本地）② 只存 git 地址（reference，不克隆，安装时拉取）（回车=②）: ')).trim() || '2';
+  const scope = scopeCh === '1' ? 'full' : 'reference';
   const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
   try {
     const { intake } = await import('./intake.mjs');
-    const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir });
-    console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes} bytes）`);
+    const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir, scope });
+    console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes === null ? 'reference scope' : r.sizeBytes + ' bytes'}）`);
     console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
     printPushReminder();
     return 0;
@@ -270,9 +322,7 @@ async function cmdWizardInteractive(args) {
 /** @param {readline.Interface} rl  @param {{root: string}} opts  @returns {Promise<number>} */
 export async function cmdWizard(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
-  console.log('OpsForge 向导 — 引导式创建能力');
-  console.log('推荐先走访谈员 @capability-interviewer（五期：访谈→蒸馏→跑通→迭代），LLM 引导式沉淀。');
-  console.log('  ① 调出 @capability-interviewer  ② 直接脚手架（逃生路径）');
+  console.log(PRINT_TOPICS['wizard-routing']);
   const route = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
   if (route !== '2') {
     console.log('请调出 @capability-interviewer；非 claude-code 平台用 opsforge-interview 纯 prompt 脚本。');
@@ -681,18 +731,28 @@ export async function cmdEvolve(rl, opts = {}) {
   const name = capId.split('.')[1];
   const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
   const draftsDir = path.join(workDir, 'packs', '_drafts', pack, name);
-  let written = 0;
-  for (const i of idxs) {
+  // P2-A: pre-allocate caseNum to prevent file-name races when multiple
+  // generateCase calls run concurrently via Promise.all. Start counting from
+  // the existing tests/ count + 1.
+  const testsDir = path.join(draftsDir, 'tests');
+  const startNum = (fs.existsSync(testsDir)
+    ? fs.readdirSync(testsDir).filter((f) => f.endsWith('.yaml')).length
+    : 0) + 1;
+  const results = await Promise.all(idxs.map(async (i, j) => {
     const it = items[i];
     try {
       const fb = it.kind === 'feedback' ? it.src : null;
       const fail = it.kind === 'failure' ? it.failure : null;
-      const { destPath, name: caseName } = generateCase(fb, fail, { draftsDir });
-      console.log(`  绿 已生成 ${destPath} (name=${caseName})`);
-      written++;
+      const r = await generateCase(fb, fail, { draftsDir, caseNum: startNum + j });
+      return { ok: true, destPath: r.destPath, caseName: r.name };
     } catch (e) {
-      console.log(`  [红] 跳过 #${i + 1}: ${e.message}`);
+      return { ok: false, idx: i, error: e.message };
     }
+  }));
+  let written = 0;
+  for (const r of results) {
+    if (r.ok) { console.log(`  绿 已生成 ${r.destPath} (name=${r.caseName})`); written++; }
+    else { console.log(`  [红] 跳过 #${r.idx + 1}: ${r.error}`); }
   }
   console.log(`\n已生成 ${written} 条草稿到 ${draftsDir}/tests/。`);
   console.log('下一步: 填写 expected + judge_rubric（标记 __FILL_ME__ 的位置），然后:');

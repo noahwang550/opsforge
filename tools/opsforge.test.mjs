@@ -457,3 +457,109 @@ test('OP22 feedback non-TTY without capId returns 2 (no hang)', async () => {
   const code = await main(['feedback']); // node:test stdin is non-TTY, no capId
   assert.equal(code, 2);
 });
+
+// ---------- P0-A: opsforge print <topic> ----------
+
+// OP23 cmdPrint emits menu topic verbatim (single source of truth with cmdMenu).
+test('OP23 cmdPrint emits menu topic verbatim', async () => {
+  const { cmdPrint } = await import('./opsforge.mjs');
+  const captured = [];
+  const code = await cmdPrint(['menu'], { out: (s) => captured.push(s) });
+  assert.equal(code, 0);
+  const text = captured.join('\n');
+  assert.ok(text.includes('OpsForge 能力工坊'), 'menu text present');
+  assert.ok(text.includes('1) 新建一个能力'), 'option 1 present');
+  assert.ok(text.includes('7) 浏览仓库全部能力'), 'option 7 present');
+  assert.ok(text.includes('0) 退出'), 'exit option present');
+});
+
+// OP24 cmdPrint emits new-flow topic with ③ third-party branch (the drift bug fix).
+test('OP24 cmdPrint new-flow includes ③ third-party branch', async () => {
+  const { cmdPrint } = await import('./opsforge.mjs');
+  const captured = [];
+  const code = await cmdPrint(['new-flow'], { out: (s) => captured.push(s) });
+  assert.equal(code, 0);
+  const text = captured.join('\n');
+  assert.ok(text.includes('③ 收录第三方能力'), 'third-party branch present');
+});
+
+// OP25 cmdPrint returns 1 on unknown topic + lists available.
+test('OP25 cmdPrint returns 1 on unknown topic', async () => {
+  const { cmdPrint } = await import('./opsforge.mjs');
+  const origErr = console.error;
+  const errCaptured = [];
+  console.error = (s) => errCaptured.push(String(s));
+  try {
+    const code = await cmdPrint(['bogus-topic']);
+    assert.equal(code, 1);
+    assert.ok(errCaptured.some((s) => s.includes('unknown topic')), 'should mention unknown topic');
+    assert.ok(errCaptured.some((s) => s.includes('menu')), 'should list available topics incl menu');
+  } finally {
+    console.error = origErr;
+  }
+});
+
+// OP26 cmdPrint returns 2 on missing topic arg + usage.
+test('OP26 cmdPrint returns 2 on missing topic arg', async () => {
+  const { cmdPrint } = await import('./opsforge.mjs');
+  const origErr = console.error;
+  const errCaptured = [];
+  console.error = (s) => errCaptured.push(String(s));
+  try {
+    const code = await cmdPrint([]);
+    assert.equal(code, 2);
+    assert.ok(errCaptured.some((s) => s.includes('usage')), 'should print usage');
+  } finally {
+    console.error = origErr;
+  }
+});
+
+// OP27 cmdPrint CLI path: main(['print', 'menu']) exits 0 (CLI-spawn test).
+test('OP27 cmdPrint CLI path main print menu exits 0', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const scriptPath = fileURLToPath(import.meta.url).replace(/opsforge\.test\.mjs$/, 'opsforge.mjs');
+  const r = spawnSync(process.execPath, [scriptPath, 'print', 'menu'], {
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert.equal(r.status, 0, `print menu should exit 0; stderr: ${r.stderr || ''}`);
+  assert.ok(r.stdout.includes('OpsForge 能力工坊'), 'stdout should contain menu text');
+});
+
+// OP27b cmdPrint CLI path: main(['print']) with no topic exits 2.
+test('OP27b cmdPrint CLI path main print no topic exits 2', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const scriptPath = fileURLToPath(import.meta.url).replace(/opsforge\.test\.mjs$/, 'opsforge.mjs');
+  const r = spawnSync(process.execPath, [scriptPath, 'print'], {
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert.equal(r.status, 2, `print with no topic should exit 2; stderr: ${r.stderr || ''}`);
+});
+
+// OP28 cmdMenu console.log matches cmdPrint('menu') output (single source of truth).
+test('OP28 cmdMenu output matches cmdPrint menu output (single source)', async () => {
+  const { cmdPrint } = await import('./opsforge.mjs');
+  // Capture cmdMenu's console.log menu() call.
+  const menuCaptured = [];
+  const origLog = console.log;
+  console.log = (s) => menuCaptured.push(String(s));
+  try {
+    // Trigger menu() print only (not the ask loop): call cmdMenu with an immediate '0' exit.
+    const rl = mockRl(['0']);
+    await cmdMenu(rl, { nonInteractive: true });
+  } finally {
+    console.log = origLog;
+  }
+  // Capture cmdPrint('menu').
+  const printCaptured = [];
+  await cmdPrint(['menu'], { out: (s) => printCaptured.push(s) });
+  // The menu text should appear in both.
+  const menuText = menuCaptured.find((s) => s.includes('OpsForge 能力工坊'));
+  const printText = printCaptured.find((s) => s.includes('OpsForge 能力工坊'));
+  assert.ok(menuText, 'cmdMenu should print menu text');
+  assert.ok(printText, 'cmdPrint should print menu text');
+  assert.equal(menuText, printText, 'menu text must be identical (single source of truth)');
+});

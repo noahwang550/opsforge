@@ -502,7 +502,23 @@ Distilled from the Phase 3.6 fix-pass (tdd-guide + e2e-runner + code-reviewer + 
 - **如何避免（已采纳）：** 薄 runtime wrapper（零 bare-dep 顶层 import，仅 `node:` 内建 + `./paths.mjs`）+ `~/.opsforge/.runtime-root.json` 记录仓库根，运行时 `pathToFileURL` 动态 import 仓库根 `install.mjs`，依赖在仓库 `node_modules` 解析。**架构不变量：`~/.opsforge/` 非完全自包含 → 仓库必须在机器上持续存在**才能 in-platform 安装。对 dogfood/开发场景够用；"装到无仓库机器"需打包 `node_modules` 发行版（后续 Phase）。
 
 
-## Next phase (Phase 4 governance flywheel — 其余项 per IMPLEMENTATION-PLAN.md)
+## Phase 4 第四刀（三痛点优化）SHIPPED 2026-08-06
+
+6-agent 流水线（planner→architect→tdd-guide→e2e-runner→code-reviewer→doc-updater）针对 dogfood 与第三方收录场景暴露的三痛点交付 P0+P1+P2，**守住 10 条硬不变量**（零新 npm 依赖 / additionalProperties:false / registry auto-gen / skeleton_guard / R16–R31 不弱化 / §C.1 / 无 Go / SSRF 全套 / Windows 兼容 / release gate 三报告不动）。
+
+- **Pain 1（固定内容去 AI 化）**：根因是 agent `source.md` prompt drift（重新叙述菜单时丢分支），非代码缺陷。**P0-A** 新增 `opsforge print <topic>` 子命令 + `PRINT_TOPICS` 单一真相源，22 处固定内容出口（菜单/子菜单/wizard/intake 守卫/report-renderer 模板/discover/doctor/status/evolve/feedback）统一走 CLI emit；4 个 agent/skill prompt 改调 print 而非自由叙述。
+- **Pain 2（流水线提速）**：**P0-B** `runSuite` 串行 for-loop → `Promise.allSettled` 并发 + `OPSFORGE_RUNNER_CONCURRENCY` 限流 + tokenSink 每 case 独立后求和（3-case 套件 90s→~30s）；**P1-C** 外置 `templates/interview-script.md` + dry-run 缓存（`computeCacheKey` Node 内置 `crypto.createHash('sha256')`）+ `--refresh`；**P2-A** distill 并行化（`generateCase` async + `caseNum` 预分配防 race）；**P2-B** `--skip-dry-run` 强制 static-only。
+- **Pain 3（第三方收录只存 git 地址）**：**P0-C** intake 失败 try/catch 回滚清理半成品 + `--keep-on-fail`；**P1-A** 新 `tools/intake-remote.mjs` `fetchRemoteMeta()` 用 Node 内置 fetch 查 GitHub API 不 clone，复用 `assertPublicUrl` 全套 SSRF 守卫，非 GitHub 回退 `git ls-remote` argv 形式；**P1-B** schema 加 `install_hint`（additionalProperties:false 保留）+ `install.mjs --from-git` clone-to-temp→install→cleanup + `findCapabilitySource` 扩展查 `_staged/third-party/`（不查 `_drafts/`）+ `installFromGit` 加 `assertSlugSegment` path-traversal 防御。
+
+设计文档：`docs/design-archive/optimization-proposal.md`（457 行）+ `optimization-architecture.md`（1274 行）。bare `node --test` 496 → **532**（+36）；6 gates 全绿（11 released + 1 staged = 12 validated）；零新 npm 依赖。
+
+### Lessons learned（三痛点优化会话）
+
+- **l. "规划者 agent 没有 Write 工具"**：上轮 6 阶段流水线失败根因——`ecc:planner`/`ecc:architect` 只有 Read/Grep/Glob，写不了磁盘文件，proposal 只活在 agent 上下文里随 compaction 丢失。**教训：doc 产出阶段（planner/architect）必须用有 Write 工具的 agent 类型（general-purpose），或让只读 agent 返回内容由主循环写盘；阶段间必须校验文件真落盘再推进。** 本轮改用 general-purpose + 每阶段 `ls`/`wc -l` 校验落盘。
+- **m. "resolveClaudeBin 修复引发 eval 连锁 fail"**：P0-B 的底层依赖 `resolveClaudeBin()`（Windows 直探 `claude.exe`）让 `isStaticOnly()` 从 true 翻 false → eval --all 不再走 static-only 而尝试 live `claude -p` → Windows 嵌套 session spawn 失败 → eval-report verdict `pending`→`fail` → release gate 拒所有能力 → registry.yaml 空 → 6 个 catalog 测试连环挂。**教训：改 `isStaticOnly()`/runner 探测逻辑后，必须用 `OPSFORGE_RUNNER=static-only` 重跑 eval --all 恢复 dogfood `pending` 基线，再重跑 release 填回 registry。** 已在 CLAUDE.md Status 行注明 eval 须 static-only 跑。
+- **n. "计时断言要留机器抖动余量"**：`TR_par1` 断言并行耗时 <200ms，本机抖到 207ms 挂——纯计时精度断言在 CI/异机必 flaky。**教训：计时断言的阈值应远低于串行基线（280ms vs 300ms+）证明"并行更快"即可，不要逼近单 case 耗时做精度断言。**
+
+
 
 **Phase 4 第一刀（skill-up 融合）SHIPPED 2026-07-27。** 其余 governance flywheel 项仍 pending：
 

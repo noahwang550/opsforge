@@ -1,0 +1,13 @@
+name: 边界情况：订单明细表 8000 万行，全表统计跑不动
+input: 跑到订单明细表这张表了，它有 8000 多万行，你给的空值率统计 SQL 跑了十几分钟都没出结果，我怕把库跑挂了，怎么办？
+expect: contains
+expected: [抽样, 估值]
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

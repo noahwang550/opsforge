@@ -179,6 +179,10 @@ test('SC10 pack/brand/upstream-ref schemas reject unknown fields', () => {
   // commercial:true requires commercial_reason
   assert.ok(!upstream({ repo: 'r', commit: 'c', license: 'MIT', intaked_at: '2026-01-01', intaked_by: 'foo', commercial: true, intake_scope: 'full' }));
   assert.ok(upstream({ repo: 'r', commit: 'c', license: 'MIT', intaked_at: '2026-01-01', intaked_by: 'foo', commercial: true, commercial_reason: 'paid license on file', intake_scope: 'partial' }));
+  // P1-B: install_hint optional (nullable string); additionalProperties:false still rejects unknown fields.
+  assert.ok(upstream({ repo: 'r', commit: 'c', license: 'MIT', intaked_at: '2026-01-01', intaked_by: 'foo', commercial: false, intake_scope: 'reference', install_hint: 'https://github.com/foo/bar;agent;bot' }));
+  assert.ok(upstream({ repo: 'r', commit: 'c', license: 'MIT', intaked_at: '2026-01-01', intaked_by: 'foo', commercial: false, intake_scope: 'reference', install_hint: null }));
+  assert.ok(!upstream({ repo: 'r', commit: 'c', license: 'MIT', intaked_at: '2026-01-01', intaked_by: 'foo', commercial: false, intake_scope: 'reference', install_hint: 123 })); // wrong type
 });
 
 // ---------- SC11 capability.schema accepts optional requires ----------

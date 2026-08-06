@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { runCase, runSuite, compareRegex, compareSchema, compareGolden, compareLlmJudge } from './test-runner.mjs';
+import { runCase, runSuite, compareRegex, compareSchema, compareGolden, compareLlmJudge, computeCacheKey } from './test-runner.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -206,6 +206,83 @@ test('TR10e compareLlmJudge handles endpoint error gracefully', async () => {
   assert.match(r.reason, /network down|judge/i);
 });
 
+// ---------- P0-B: runSuite Promise.all parallelization ----------
+
+// TR_par1 runSuite runs cases concurrently (parallel < serial 1/2 time).
+test('TR_par1 runSuite runs cases concurrently (parallel < serial 1/2 time)', async () => {
+  const tmp = mkTmp();
+  process.env.OPSFORGE_HOME = tmp;
+  const dir = mkCapDir(tmp);
+  const delay = 100;
+  const mockFetch = async () => {
+    await new Promise((r) => setTimeout(r, delay));
+    return { ok: true, text: async () => 'hello world' };
+  };
+  for (let i = 0; i < 3; i++) {
+    fs.writeFileSync(path.join(dir, 'tests', `case-0${i + 1}.yaml`), yaml.dump({
+      name: `case-0${i + 1}`, input: 'hello', expect: 'contains', expected: 'hello',
+    }));
+  }
+  const start = Date.now();
+  const { cases } = await runSuite(dir, {
+    runner: 'http', url: 'http://dify/v1/chat-messages', fetch: mockFetch,
+    opsforgeHome: tmp,
+  });
+  const elapsed = Date.now() - start;
+  assert.equal(cases.length, 3);
+  assert.ok(cases.every((c) => c.pass === true), 'all cases should pass');
+  // 并行 ≈ delay(100ms)；串行 ≈ 3×delay(300ms+)。阈值 280 留机器抖动余量，
+  // 仍远低于串行基线，足以证明 Promise.all 并发生效（非计时精度断言）。
+  assert.ok(elapsed < 280, `parallel should be < 280ms; got ${elapsed}ms (serial would be 300ms+)`);
+});
+
+// TR_par2 runSuite OPSFORGE_RUNNER_CONCURRENCY=1 falls back to serial.
+test('TR_par2 runSuite OPSFORGE_RUNNER_CONCURRENCY=1 falls back to serial', async () => {
+  const tmp = mkTmp();
+  process.env.OPSFORGE_HOME = tmp;
+  const origConc = process.env.OPSFORGE_RUNNER_CONCURRENCY;
+  process.env.OPSFORGE_RUNNER_CONCURRENCY = '1';
+  const dir = mkCapDir(tmp);
+  const delay = 50;
+  const mockFetch = async () => {
+    await new Promise((r) => setTimeout(r, delay));
+    return { ok: true, text: async () => 'hello world' };
+  };
+  for (let i = 0; i < 3; i++) {
+    fs.writeFileSync(path.join(dir, 'tests', `case-0${i + 1}.yaml`), yaml.dump({
+      name: `case-0${i + 1}`, input: 'hello', expect: 'contains', expected: 'hello',
+    }));
+  }
+  try {
+    const start = Date.now();
+    const { cases } = await runSuite(dir, {
+      runner: 'http', url: 'http://dify/v1/chat-messages', fetch: mockFetch,
+      opsforgeHome: tmp,
+    });
+    const elapsed = Date.now() - start;
+    assert.equal(cases.length, 3);
+    assert.ok(elapsed >= 140, `serial should be >= 140ms; got ${elapsed}ms`);
+  } finally {
+    if (origConc === undefined) delete process.env.OPSFORGE_RUNNER_CONCURRENCY;
+    else process.env.OPSFORGE_RUNNER_CONCURRENCY = origConc;
+  }
+});
+
+// TR_par3 runSuite tokenSink aggregates correctly across parallel cases (static-only: 0 tokens).
+test('TR_par3 runSuite tokenSink aggregates correctly across parallel cases', async () => {
+  const tmp = mkTmp();
+  process.env.OPSFORGE_HOME = tmp;
+  const dir = mkCapDir(tmp);
+  for (let i = 0; i < 3; i++) {
+    fs.writeFileSync(path.join(dir, 'tests', `case-0${i + 1}.yaml`), yaml.dump({
+      name: `case-0${i + 1}`, input: 'hello', expect: 'contains', expected: 'hello',
+    }));
+  }
+  const { summary } = await runSuite(dir, { runner: 'static-only', opsforgeHome: tmp });
+  assert.equal(summary.token_total, 0, 'static-only should aggregate 0 tokens');
+  assert.equal(summary.total, 3);
+});
+
 // ---------- TR11 runSuite handles empty tests dir ----------
 test('TR11 runSuite handles empty tests dir gracefully', async () => {
   const tmp = mkTmp();
@@ -226,6 +303,64 @@ test('TR12 runSuite handles missing tests dir gracefully', async () => {
   const { summary, cases } = await runSuite(dir, { runner: 'static-only' });
   assert.equal(cases.length, 0);
   assert.equal(summary.total, 0);
+});
+
+// ---------- P1-C: dry-run cache ----------
+
+// TR_cache1 computeCacheKey is stable for same capDir + case + systemPrompt.
+test('TR_cache1 computeCacheKey is stable for same inputs', () => {
+  const k1 = computeCacheKey('/tmp/cap', { name: 'case-01' }, 'system prompt body');
+  const k2 = computeCacheKey('/tmp/cap', { name: 'case-01' }, 'system prompt body');
+  assert.equal(k1, k2);
+  assert.equal(k1.length, 16);
+});
+
+// TR_cache2 computeCacheKey changes when systemPrompt changes (auto-invalidate).
+test('TR_cache2 computeCacheKey changes when systemPrompt changes', () => {
+  const k1 = computeCacheKey('/tmp/cap', { name: 'case-01' }, 'system prompt body');
+  const k2 = computeCacheKey('/tmp/cap', { name: 'case-01' }, 'system prompt body CHANGED');
+  assert.notEqual(k1, k2, 'cache key must differ when body changes');
+});
+
+// TR_cache3 computeCacheKey returns null for empty systemPrompt (no caching).
+test('TR_cache3 computeCacheKey returns null for empty systemPrompt', () => {
+  assert.equal(computeCacheKey('/tmp/cap', { name: 'case-01' }, ''), null);
+  assert.equal(computeCacheKey('/tmp/cap', { name: 'case-01' }, null), null);
+});
+
+// TR_cache4 runSuite skipDryRun forces static-only (no spawn).
+test('TR_cache4 runSuite skipDryRun forces static-only path', async () => {
+  const tmp = mkTmp();
+  process.env.OPSFORGE_HOME = tmp;
+  const dir = mkCapDir(tmp);
+  for (let i = 0; i < 2; i++) {
+    fs.writeFileSync(path.join(dir, 'tests', `case-0${i + 1}.yaml`), yaml.dump({
+      name: `case-0${i + 1}`, input: 'hello', expect: 'contains', expected: 'hello',
+    }));
+  }
+  const { summary, cases } = await runSuite(dir, { runner: 'claude', skipDryRun: true, opsforgeHome: tmp });
+  assert.equal(cases.length, 2);
+  assert.ok(cases.every((c) => c.pass === 'pending'), 'skipDryRun should force pending (static-only)');
+  assert.equal(summary.runner, 'static-only');
+});
+
+// TR_cache5 runSuite OPSFORGE_SKIP_DRY_RUN=1 env also forces static-only.
+test('TR_cache5 runSuite OPSFORGE_SKIP_DRY_RUN=1 forces static-only', async () => {
+  const tmp = mkTmp();
+  process.env.OPSFORGE_HOME = tmp;
+  const orig = process.env.OPSFORGE_SKIP_DRY_RUN;
+  process.env.OPSFORGE_SKIP_DRY_RUN = '1';
+  const dir = mkCapDir(tmp);
+  fs.writeFileSync(path.join(dir, 'tests', 'case-01.yaml'), yaml.dump({
+    name: 'case-01', input: 'hello', expect: 'contains', expected: 'hello',
+  }));
+  try {
+    const { summary } = await runSuite(dir, { runner: 'claude', opsforgeHome: tmp });
+    assert.equal(summary.runner, 'static-only');
+  } finally {
+    if (orig === undefined) delete process.env.OPSFORGE_SKIP_DRY_RUN;
+    else process.env.OPSFORGE_SKIP_DRY_RUN = orig;
+  }
 });
 
 // ---------- TR13 Phase 2.2: runCase routes implemented modes via injected actual ----------

@@ -1,0 +1,13 @@
+name: 正常情况：MySQL 库手工接力模式的开场引导
+input: 你好，我想给客户的 CRM 数据库做一次数据质量体检。我们用的是 MySQL，平台没有连数据库的功能，我自己电脑上有 Navicat。
+expect: contains
+expected: [只读, 绝不]
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: positive
+source: recalled
+confidence: high
+allow_exact_reason: null
+ref: null

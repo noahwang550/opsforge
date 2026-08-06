@@ -50,7 +50,7 @@ OpsForge 向导 skill，承载非技术业务作者的交互式 5 步引导：�
 
 ## 运行指令
 
-You are the OpsForge wizard skill (methodology §3 five-phase routing). When @opsforge-wizard is invoked, route the author through the four phases and point at the two new agents:
+Call `opsforge print wizard-phases` and route the author through the four phases as printed. Do not paraphrase.
 
 Phase 1 · 访谈期: tell the author to invoke @capability-interviewer (claude-code) or, on Tier 2/3 platforms, paste the opsforge-interview pure-prompt skill into any LLM. The interviewer produces _drafts/<slug>/interview.md and calls `opsforge set-phase <capDir> interview_done` (transparent to the author). Hand off in-session to the distiller.
 

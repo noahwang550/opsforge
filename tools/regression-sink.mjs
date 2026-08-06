@@ -62,13 +62,17 @@ export function resolveNameConflict(baseName, draftsDir) {
  * Generate a tests/case-NN.yaml draft from a feedback entry or eval failure.
  * ALWAYS leaves expected / judge_rubric as __FILL_ME__ (R7 + R18 enforce human fill).
  *
+ * P2-A: async function (returns a Promise). opts.caseNum pre-allocates the case
+ * file number to prevent file-name races when multiple generateCase calls run
+ * concurrently via Promise.all (cmdEvolve uses this).
+ *
  * @param {{cap_id: string, rating?: number, text?: string}|null} feedback   feedback jsonl entry (rating<=3 used)
  * @param {{cap_id: string, case?: string, mode?: string, reason?: string, actual?: string}|null} failure  failures.jsonl entry
  * @param {{draftsDir: string, caseNum?: number}} opts  draftsDir = absolute _drafts/<pack>/<name>/
- * @returns {{destPath: string, name: string, yaml: string}} written draft
+ * @returns {Promise<{destPath: string, name: string, yaml: string}>} written draft
  * @throws if neither feedback nor failure provides usable text
  */
-export function generateCase(feedback, failure, opts) {
+export async function generateCase(feedback, failure, opts) {
   if (!opts || !opts.draftsDir) throw new Error('generateCase: opts.draftsDir required');
   const capId = (feedback && feedback.cap_id) || (failure && failure.cap_id);
   assertCapId(capId);
@@ -101,11 +105,13 @@ export function generateCase(feedback, failure, opts) {
   };
   const testsDir = path.join(opts.draftsDir, 'tests');
   fs.mkdirSync(testsDir, { recursive: true });
-  const existing = fs.existsSync(testsDir)
-    ? fs.readdirSync(testsDir).filter((f) => f.endsWith('.yaml')).length
-    : 0;
-  const num = String(existing + 1).padStart(2, '0');
-  const destPath = path.join(testsDir, `case-${num}.yaml`);
+  // P2-A: opts.caseNum pre-allocates the file number to avoid races when
+  // multiple generateCase calls run concurrently. When absent, fall back to
+  // the existing count+1 behavior (backward-compat for serial callers).
+  const num = opts.caseNum
+    || (fs.existsSync(testsDir) ? fs.readdirSync(testsDir).filter((f) => f.endsWith('.yaml')).length + 1 : 1);
+  const numStr = String(num).padStart(2, '0');
+  const destPath = path.join(testsDir, `case-${numStr}.yaml`);
   fs.writeFileSync(destPath, yaml.dump(caseYaml, { lineWidth: 120 }));
   return { destPath, name, yaml: yaml.dump(caseYaml) };
 }

@@ -49,9 +49,9 @@ test('RS3: resolveNameConflict appends -2/-3 suffix on collision', () => {
   assert.equal(second, 'alpha-beta-3');
 });
 
-test('RS4: generateCase from feedback produces valid draft (name matches NAME_RE, input has text, expected=__FILL_ME__)', () => {
+test('RS4: generateCase from feedback produces valid draft (name matches NAME_RE, input has text, expected=__FILL_ME__)', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rs4-'));
-  const { destPath, name, yaml: yamlOut } = generateCase(
+  const { destPath, name, yaml: yamlOut } = await generateCase(
     { cap_id: 'mkt.copywriter', rating: 2, text: 'Agent missed the deadline badly' },
     null,
     { draftsDir: tmp },
@@ -68,9 +68,9 @@ test('RS4: generateCase from feedback produces valid draft (name matches NAME_RE
   assert.equal(parsed.expect, 'llm_judge');
 });
 
-test('RS5: generateCase from failure with contains-reason → expect=contains', () => {
+test('RS5: generateCase from failure with contains-reason → expect=contains', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rs5-'));
-  const { yaml: yamlOut } = generateCase(
+  const { yaml: yamlOut } = await generateCase(
     null,
     { cap_id: 'mkt.copywriter', case: 'c1', mode: 'contains', reason: 'missing substring "deadline"', actual: 'no deadline mentioned' },
     { draftsDir: tmp },
@@ -80,14 +80,14 @@ test('RS5: generateCase from failure with contains-reason → expect=contains', 
   assert.equal(parsed.expected, '__FILL_ME__');
 });
 
-test('RS5b: generateCase throws when neither feedback nor failure has usable text', () => {
+test('RS5b: generateCase throws when neither feedback nor failure has usable text', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rs5b-'));
-  assert.throws(() => generateCase(null, { cap_id: 'mkt.copywriter' }, { draftsDir: tmp }));
+  await assert.rejects(() => generateCase(null, { cap_id: 'mkt.copywriter' }, { draftsDir: tmp }));
 });
 
-test('RS6: generated draft fails validateDir (R7 placeholder_clean on __FILL_ME__)', () => {
+test('RS6: generated draft fails validateDir (R7 placeholder_clean on __FILL_ME__)', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rs6-'));
-  generateCase(
+  await generateCase(
     { cap_id: 'mkt.copywriter', rating: 2, text: 'Agent missed the deadline badly here' },
     null,
     { draftsDir: tmp },

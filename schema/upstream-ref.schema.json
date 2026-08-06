@@ -17,7 +17,8 @@
     "intake_scope": {
       "type": "string",
       "enum": ["full", "partial", "vendored", "reference"]
-    }
+    },
+    "install_hint": { "type": ["string", "null"] }
   },
   "allOf": [
     {

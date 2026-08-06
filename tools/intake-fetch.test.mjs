@@ -147,3 +147,88 @@ test('IF_inj2 fetchUpstream rejects shell-metachar URL before clone (no execFile
   await assert.rejects(() => fetchUpstream('https://github.com/foo/bar;touch marker', { execFile: mockExecFile, dest }), /metachar|shell|injection/i);
   assert.equal(execFileCalled, false, 'execFile must NOT be called — URL rejected pre-clone');
 });
+
+// ---------- P1-A: fetchRemoteMeta (reference scope, API LICENSE fetch, no clone) ----------
+
+// IF_R1 fetchRemoteMeta reuses assertPublicUrl SSRF guard (rejects private/loopback).
+test('IF_R1 fetchRemoteMeta rejects SSRF private URL before any API call', async () => {
+  const { fetchRemoteMeta } = await import('./intake-remote.mjs');
+  let fetchCalled = false;
+  const mockFetch = async () => { fetchCalled = true; return { ok: true, json: async () => ({}) }; };
+  await assert.rejects(() => fetchRemoteMeta('https://127.0.0.1/evil', { fetch: mockFetch }), /private|ssrf|loopback/i);
+  assert.equal(fetchCalled, false, 'fetch must NOT be called — URL rejected by SSRF guard');
+});
+
+// IF_R2 fetchRemoteMeta GitHub URL returns {repo, commit, license, sizeBytes:null, intakeScope:'reference'}.
+test('IF_R2 fetchRemoteMeta GitHub URL returns license + commit via API (mocked)', async () => {
+  const { fetchRemoteMeta } = await import('./intake-remote.mjs');
+  const mockFetch = async (url) => {
+    if (url.endsWith('/license')) {
+      return { ok: true, json: async () => ({ license: { spdx_id: 'MIT' } }) };
+    }
+    if (url.endsWith('/commits/HEAD')) {
+      return { ok: true, json: async () => ({ sha: 'abcdef1234567890' }) };
+    }
+    return { ok: false, status: 404 };
+  };
+  const meta = await fetchRemoteMeta('https://github.com/foo/bar.git', { fetch: mockFetch });
+  assert.equal(meta.repo, 'https://github.com/foo/bar.git');
+  assert.equal(meta.license, 'MIT');
+  assert.equal(meta.commit, 'abcdef1'); // short sha (first 7 chars)
+  assert.equal(meta.sizeBytes, null);
+  assert.equal(meta.intakeScope, 'reference');
+});
+
+// IF_R3 fetchRemoteMeta non-GitHub URL falls back to git ls-remote (argv form, no shell).
+test('IF_R3 fetchRemoteMeta non-GitHub URL falls back to git ls-remote', async () => {
+  const { fetchRemoteMeta } = await import('./intake-remote.mjs');
+  let execFileCalled = false;
+  const mockExecFile = (cmd, args) => {
+    execFileCalled = true;
+    assert.equal(cmd, 'git', 'should call git, not a shell');
+    assert.deepEqual(args, ['ls-remote', 'https://gitlab.com/foo/bar.git', 'HEAD'], 'argv form, no shell');
+    return 'deadbeef12345678\tHEAD\n';
+  };
+  const meta = await fetchRemoteMeta('https://gitlab.com/foo/bar.git', { execFile: mockExecFile });
+  assert.equal(meta.repo, 'https://gitlab.com/foo/bar.git');
+  assert.equal(meta.commit, 'deadbee');
+  assert.equal(meta.license, 'UNKNOWN'); // non-GitHub: author fills license
+  assert.equal(meta.sizeBytes, null);
+  assert.equal(meta.intakeScope, 'reference');
+  assert.equal(execFileCalled, true, 'execFile should be called for non-GitHub');
+});
+
+// IF_R4 fetchRemoteMeta GitHub API 404 (repo not found) returns UNKNOWN license + unknown commit.
+test('IF_R4 fetchRemoteMeta GitHub API 404 returns UNKNOWN + unknown', async () => {
+  const { fetchRemoteMeta } = await import('./intake-remote.mjs');
+  const mockFetch = async () => ({ ok: false, status: 404 });
+  const meta = await fetchRemoteMeta('https://github.com/nonexistent/repo.git', { fetch: mockFetch });
+  assert.equal(meta.license, 'UNKNOWN');
+  assert.equal(meta.commit, 'unknown');
+  assert.equal(meta.intakeScope, 'reference');
+});
+
+// IF_R5 fetchRemoteMeta CLI path via intake() reference scope.
+test('IF_R5 intake scope=reference produces upstream-ref with install_hint', async () => {
+  const { intake } = await import('./intake.mjs');
+  const tmp = mkTmp();
+  const mockFetch = async (url) => {
+    if (url.endsWith('/license')) return { ok: true, json: async () => ({ license: { spdx_id: 'MIT' } }) };
+    if (url.endsWith('/commits/HEAD')) return { ok: true, json: async () => ({ sha: 'abcdef1234567890' }) };
+    return { ok: false, status: 404 };
+  };
+  const r = await intake({
+    repoUrl: 'https://github.com/upstream/rep.git',
+    license: 'MIT',
+    kind: 'agent', name: 'refpkg', owner: 'third-party',
+    repoRoot: tmp, scope: 'reference', fetch: mockFetch,
+  });
+  assert.equal(r.allowed, true);
+  assert.equal(r.commit, 'abcdef1');
+  assert.equal(r.sizeBytes, null);
+  const draftDir = path.join(tmp, 'packs', '_drafts', 'third-party', 'refpkg');
+  const ref = JSON.parse(fs.readFileSync(path.join(draftDir, 'upstream-ref.json'), 'utf8'));
+  assert.equal(ref.intake_scope, 'reference');
+  assert.equal(ref.install_hint, 'https://github.com/upstream/rep.git;agent;refpkg');
+  assert.equal(ref.repo, 'https://github.com/upstream/rep.git');
+});

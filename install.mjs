@@ -81,8 +81,20 @@ function findCapabilitySource(capId, repoRoot) {
       }
     }
   }
+  // P1-B: third-party capabilities live under packs/_staged/third-party/<kind>/<name>/.
+  // Only _staged/ is searched — _drafts/ are not installable (draft gate R7 blocks them).
+  // reference-scope capabilities (intake_scope='reference') use install --from-git
+  // (installFromGit) rather than findCapabilitySource, but their staged form still
+  // resolves here for install --install <id>.
+  for (const kd of kindDirs) {
+    const dir = path.join(repoRoot, 'packs', '_staged', 'third-party', kd, name);
+    if (findManifest(dir)) return dir;
+  }
   return null;
 }
+
+// P1-B: export findCapabilitySource for installFromGit + tests.
+export { findCapabilitySource };
 
 function getManifestPath(project, opsforgeHome) {
   const manifestsDir = path.join(opsforgeHome || resolveOpsforgeHome(), 'manifests');
@@ -160,11 +172,16 @@ export async function install(args) {
   const { platform = 'claude-code', capId, version, brand, project = 'default', dryRun = false, downgrade = false } = args;
   const repoRoot = args.repoRoot || process.cwd();
   const opsforgeHome = args.opsforgeHome || resolveOpsforgeHome();
-  assertCapId(capId);
+  // P1-B: capId may be omitted when capDir is passed directly (installFromGit);
+  // it's derived from capability.yaml.id after parsing. When capId is given,
+  // validate it upfront (catches path-traversal early).
+  if (capId) assertCapId(capId);
   // P1-2: slug-validate brand (path-traversal defense, §5.4 call-site list)
+  // — validate BEFORE findCapabilitySource so invalid brand throws before
+  // the "cap not found" error (IN8b expects /brand/ match).
   if (brand) assertSlugSegment(brand, 'brand');
 
-  const capDir = findCapabilitySource(capId, repoRoot);
+  const capDir = args.capDir || findCapabilitySource(capId, repoRoot);
   if (!capDir) {
     // NIT 8: stable error code so callers can match by type, not message text.
     const err = new Error(`install: capability "${capId}" not found in repository`);
@@ -174,6 +191,12 @@ export async function install(args) {
 
   const manifestPath = findManifest(capDir);
   const capYaml = parseManifest(manifestPath);
+
+  // P1-B: derive effectiveCapId from capId or capability.yaml.id (for installFromGit).
+  const effectiveCapId = capId || (capYaml && capYaml.id) || null;
+  if (!effectiveCapId) {
+    throw new Error('install: cannot determine capId (neither args.capId nor capability.yaml.id)');
+  }
 
   const adapter = await getAdapter(platform);
   const cap = { ...parseCapability(capDir), dir: capDir };
@@ -215,8 +238,8 @@ export async function install(args) {
   for (const a of artifacts) {
     const isPaste = a && (a.kind === 'manual-paste' || (!a.targetPath && a.pasteInstructions));
     if (!isPaste) continue;
-    const parts = capId.split('.');
-    const capSlug = parts.length >= 2 ? parts[parts.length - 1] : capId;
+    const parts = effectiveCapId.split('.');
+    const capSlug = parts.length >= 2 ? parts[parts.length - 1] : effectiveCapId;
     assertSlugSegment(capSlug, 'capSlug');
     const pastePath = path.join(opsforgeHome, 'paste', project, `${capSlug}.md`);
     await atomicWrite(pastePath, a.pasteInstructions || a.content || '');
@@ -246,7 +269,7 @@ export async function install(args) {
   const sourceCommit = getSourceCommit(repoRoot);
 
   const entry = {
-    id: capId,
+    id: effectiveCapId,
     version: capYaml.version,
     source_commit: sourceCommit,
     customer: brand || null,
@@ -259,7 +282,7 @@ export async function install(args) {
     deps_missing: depsMissing,
   };
 
-  manifest.capabilities = manifest.capabilities.filter((c) => c.id !== capId);
+  manifest.capabilities = manifest.capabilities.filter((c) => c.id !== effectiveCapId);
   manifest.capabilities.push(entry);
   await writeManifest(manifest, project, opsforgeHome);
 
@@ -267,7 +290,7 @@ export async function install(args) {
   if (capYaml.kind === 'workflow') {
     const steps = capYaml.steps || [];
     for (const step of steps) {
-      if (step.capability && step.capability !== capId) {
+      if (step.capability && step.capability !== effectiveCapId) {
         try {
           await install({
             platform, capId: step.capability, project, dryRun,
@@ -282,7 +305,7 @@ export async function install(args) {
     // Update manifest entry with collected deps_missing
     if (depsMissing.length > 0) {
       const updatedManifest = readManifest(project, opsforgeHome);
-      const updatedEntry = updatedManifest.capabilities.find((c) => c.id === capId);
+      const updatedEntry = updatedManifest.capabilities.find((c) => c.id === effectiveCapId);
       if (updatedEntry) {
         updatedEntry.deps_missing = depsMissing;
         await writeManifest(updatedManifest, project, opsforgeHome);
@@ -640,6 +663,52 @@ export async function repair(args) {
   return { repaired, issues };
 }
 
+/**
+ * P1-B: installFromGit — clone a git URL on-demand → install → cleanup temp.
+ * Reuses fetchUpstream (SSRF + 50MB cap + argv form). Used by `install --from-git`
+ * to install reference-scope capabilities (intake_scope='reference') that only
+ * stored the git URL during intake (no local clone was retained).
+ * @param {string} gitUrl  https public git URL
+ * @param {string} kind  agent|skill|mcp|workflow|bundle (kind dir name plural)
+ * @param {string} name  capability name slug
+ * @param {{platform: string, project?: string, brand?: string, opsforgeHome?: string,
+ *          repoRoot?: string, execFile?: Function, dest?: string}} opts
+ * @returns {Promise<{installed: string[], manifest: Object}>}
+ */
+export async function installFromGit(gitUrl, kind, name, opts = {}) {
+  // §5.4 path-traversal defense: validate kind + name slugs BEFORE path.join,
+  // so a crafted name (e.g. '..') can't escape the clone temp dir.
+  assertSlugSegment(name, 'name');
+  const kindSlug = kind.replace(/s$/, '');
+  assertSlugSegment(kindSlug, 'kind');
+  const { fetchUpstream } = await import('./tools/intake-fetch.mjs');
+  // Clone-to-temp (reuses SSRF guard + 50MB cap + argv form, no shell).
+  const tempDir = await fetchUpstream(gitUrl, { execFile: opts.execFile, dest: opts.dest });
+  try {
+    // Locate the capability inside the clone.
+    const kindDir = kind.endsWith('s') ? kind : (kind + 's');
+    const capDir = path.join(tempDir.dir, kindDir, name);
+    if (!fs.existsSync(path.join(capDir, 'capability.yaml'))
+        && !fs.existsSync(path.join(capDir, 'SKILL.md'))
+        && !fs.existsSync(path.join(capDir, 'mcp.yaml'))
+        && !fs.existsSync(path.join(capDir, 'workflow.yaml'))) {
+      throw new Error(`install: ${kind}/${name} not found in ${gitUrl}`);
+    }
+    // install({ capDir, ... }) — install() supports capDir direct (P1-B).
+    return await install({
+      platform: opts.platform || 'claude-code',
+      project: opts.project || 'default',
+      brand: opts.brand,
+      repoRoot: opts.repoRoot || process.cwd(),
+      opsforgeHome: opts.opsforgeHome || resolveOpsforgeHome(),
+      capDir,
+    });
+  } finally {
+    // Cleanup temp clone (best-effort).
+    try { fs.rmSync(tempDir.dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+}
+
 /** CLI */
 export function main() {
   const argv = process.argv.slice(2);
@@ -734,8 +803,23 @@ export function main() {
         const state = resumeRun({ runId, workflowId: wfId });
         console.log(`resumed: ${wfId}/${runId} (status=${state.status}, current=${state.current_node})`);
         process.exit(0);
+      } else if (argv.includes('--from-git')) {
+        // P1-B: install a reference-scope capability from a git URL on-demand.
+        const idx = argv.indexOf('--from-git');
+        const gitUrl = argv[idx + 1];
+        const kind = argv.includes('--kind') ? argv[argv.indexOf('--kind') + 1] : 'agent';
+        const name = argv.includes('--name') ? argv[argv.indexOf('--name') + 1] : '';
+        if (!gitUrl || !name) {
+          console.error('usage: node install.mjs --from-git <url> --kind <kind> --name <name> [--platform <p>] [--project <p>]');
+          process.exit(2);
+        }
+        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const project = argv.includes('--project') ? argv[argv.indexOf('--project') + 1] : 'default';
+        const r = await installFromGit(gitUrl, kind, name, { platform, project });
+        console.log(`installed from git: ${r.installed.join(', ')}`);
+        process.exit(0);
       } else {
-        console.error('usage: node install.mjs --install <id> [--profile <p>] | --uninstall <id> | --list | --doctor | --run-workflow <id> | --list-runs [wfId] | --abort <runId> <wfId> | --resume <runId> <wfId>');
+        console.error('usage: node install.mjs --install <id> [--profile <p>] | --uninstall <id> | --list | --doctor | --run-workflow <id> | --list-runs [wfId] | --abort <runId> <wfId> | --resume <runId> <wfId> | --from-git <url> --kind <kind> --name <name>');
         process.exit(2);
       }
     } catch (e) {

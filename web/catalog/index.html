@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OpsForge 业务能力目录">
+  <title>OpsForge 能力目录</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="OpsForge 能力目录首页"><span class="brand-mark" aria-hidden="true">OF</span><span><strong>OpsForge</strong><small>能力目录</small></span></a>
+    <label class="search-box"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索能力、场景或关键词" autocomplete="off"><kbd>Ctrl K</kbd></label>
+    <label class="platform-control"><span>目标平台</span><select id="platform" aria-label="选择目标平台"></select></label>
+    <div class="catalog-count"><strong id="total-count">--</strong><span>项正式能力</span></div>
+  </header>
+  <main class="workspace">
+    <aside class="filters" id="filters" aria-label="能力筛选">
+      <div class="filter-heading"><h2>筛选</h2><button class="text-button" id="clear-filters" type="button">清空</button></div>
+      <label class="availability-switch"><input id="available-only" type="checkbox"><span>仅看当前平台可用</span></label>
+      <section class="filter-section reference-switch"><label class="availability-switch"><input id="include-examples" type="checkbox"><span>包含示例能力</span></label><p>示例仅供参考，不可直接用于业务。</p></section>
+      <section class="filter-section"><h3>适用范围</h3><div id="scope-filters" class="check-list"></div></section>
+      <section class="filter-section" id="project-filter-section" hidden><h3>项目</h3><div id="project-filters" class="check-list"></div></section>
+      <section class="filter-section"><h3>能力类型</h3><div id="kind-filters" class="check-list"></div></section>
+      <section class="filter-section"><h3>业务场景</h3><div id="scenario-filters" class="check-list"></div></section>
+      <section class="filter-section"><h3>能力来源</h3><div id="source-filters" class="check-list"></div></section>
+      <section class="filter-section"><h3>质量状态</h3><div id="quality-filters" class="check-list"></div></section>
+    </aside>
+    <section class="catalog" aria-labelledby="page-title">
+      <div class="catalog-toolbar"><div><p class="eyebrow">正式能力库</p><h1 id="page-title">找到适合当前业务的能力</h1><p class="result-summary"><span id="result-count">--</span> <span id="result-label">项可使用能力</span> · <span id="platform-summary">正在读取平台</span></p></div><div class="toolbar-actions"><button class="icon-text-button filter-trigger" id="open-filters" type="button" aria-controls="filters" aria-expanded="false">筛选</button><label class="sort-control">排序<select id="sort"><option value="relevance">相关度</option><option value="name">名称</option><option value="released">更新时间</option><option value="quality">质量</option></select></label></div></div>
+      <div id="active-filters" class="active-filters" aria-live="polite"></div>
+      <div id="loading" class="state-panel">正在加载正式能力...</div>
+      <div id="error" class="state-panel error-state" hidden><strong>目录暂时无法读取</strong><p>请稍后刷新页面。</p><button id="retry" class="primary-button" type="button">重新加载</button></div>
+      <div id="empty" class="state-panel" hidden><strong>没有符合条件的能力</strong><p>可以减少筛选条件，或切换目标平台继续查找。</p><button id="empty-clear" class="secondary-button" type="button">清空筛选</button></div>
+      <div id="capability-list" class="capability-list" role="list"></div>
+    </section>
+  </main>
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="detail-drawer" id="detail-drawer" aria-labelledby="detail-title" aria-modal="true" role="dialog" hidden>
+    <div class="drawer-header"><button class="icon-button" id="close-detail" type="button" aria-label="关闭详情" title="关闭详情">×</button><div class="drawer-heading"><div class="capability-icon" id="detail-icon" aria-hidden="true">A</div><div><p class="eyebrow" id="detail-type">能力详情</p><h2 id="detail-title">能力名称</h2></div></div><p id="detail-description" class="drawer-description"></p><div id="detail-meta" class="meta-row"></div><div id="reference-notice" class="reference-notice" hidden><strong>示例能力，不可直接使用</strong><span>该能力仅用于参考和演示，不提供业务使用入口。</span></div></div>
+    <div class="drawer-content"><section><h3>能力说明</h3><p id="detail-body"></p></section><section><h3>适用场景</h3><ul id="detail-scenarios" class="scenario-list"></ul></section><section><h3>平台适配</h3><div id="detail-platforms" class="platform-list"></div></section><section><h3>质量概览</h3><div id="detail-quality" class="quality-grid"></div></section><section><h3>依赖能力</h3><div id="detail-dependencies"></div></section></div>
+    <div class="drawer-footer"><div><span class="footer-label">当前平台</span><strong id="footer-platform">--</strong></div><button class="primary-button" id="show-usage" type="button">查看使用方式</button></div>
+    <section class="usage-panel" id="usage-panel" hidden aria-labelledby="usage-title"><div class="usage-heading"><div><p class="eyebrow">使用方式</p><h3 id="usage-title"></h3></div><button class="icon-button" id="close-usage" type="button" aria-label="关闭使用方式">×</button></div><ol id="usage-steps"></ol><div id="usage-requirements"></div></section>
+  </aside>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

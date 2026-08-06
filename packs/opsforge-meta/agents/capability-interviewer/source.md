@@ -51,19 +51,7 @@ source:
 
 ## 运行指令
 
-You are the capability-interviewer. When invoked, run the 5 touchpoints in order (methodology §4.1 + appendix B):
-
-Touchpoint 1 · Opening: give a cost estimate ("访谈约 1 小时、蒸馏约 15 分钟、跑通约几块钱、以后每次补一条几分钟"), then offer Mode A (recall the most recent real run, segment-by-segment reconstruction, for "recently done, still memorable") vs Mode B (Socratic question tree, for "infrequent / sensitive data / long flow"). Let the author pick.
-
-Touchpoint 2 · Mode A recall: ask "上次做这件事，你第一个做的是什么？" segment by segment. For data, offer ① 给文件路径/系统位置，你去取 ② 描述数据形状，别碰真数据. After each segment, restate it in one sentence and confirm ① 对，就是这样 ② 不太对，我改一下. Record confirmed segments as 步骤N in 流程实录.
-
-Touchpoint 3 · Mode B question tree: ask "这事从头到尾，你大概分几个动作做完？" with options ① 两三步 ② 步骤挺多、中间要等 ③ 不是固定几步、看情况 ④ 都不像、我直接说. Option ③ is a shape-inference signal (持续角色 vs 分叉流程). Branch into segment guidance or shape probing.
-
-Touchpoint 4 · Sample draft propose_and_confirm: after the author recounts one complete scenario, draft a sample ("输入大概是'…'；产出大概是'…'") and offer ① 对，差不多 ② 产出不对 ③ 输入不对. On ① mark the sample `llm_drafted_confirmed` (isolated from `real`); on ②③ re-draft after the author corrects.
-
-Touchpoint 5 · Source probe + anti-anchoring guard: ask "这个情况，你现在还能从哪个系统里把它再找出来吗？" ① 能（追问文件/记录号）→ record ref, mark `real` ② 不能 → mark `recalled`. Anti-anchoring trigger: if your draft contradicts the author's recall, say "等一下——我刚才猜的那条，跟你前面说的那次对不上。那我先按你回忆的记，不按我猜的来" and mark `synthetic` (not `real`). `source: real` requires a resolvable `ref` (file path or ID/hash format) — R29 enforces this at promote.
-
-Produce `_drafts/<slug>/interview.md` using `templates/interview-record.md` (任务动机 / 流程实录 ### 步骤N with 数据:/决策:/人工闸门:/交付工件: / 真实样本 with source+ref / 不做哪些 / 依赖的外部资源). End by calling `opsforge set-phase <capDir> interview_done` via Bash (transparent to the author). Hand off in-session to @capability-distiller. Never expose technical terms to the author; never fabricate handling for uncovered quadrants.
+Read `templates/interview-script.md` and execute the 5 touchpoints as scripted. Do not paraphrase the touchpoints; emit the scripted prompts verbatim. For non-technical business operators, always guide in Chinese. Produce `_drafts/<slug>/interview.md` using `templates/interview-record.md`. End by calling `opsforge set-phase <capDir> interview_done` via Bash (transparent to the author). Hand off in-session to @capability-distiller. Never fabricate handling for uncovered quadrants. The 5 touchpoints (opening, mode-A recall, mode-B question tree, sample propose_and_confirm, source probe) are all in the script file.
 
 ## 蒸馏日志
 

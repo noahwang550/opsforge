@@ -93,3 +93,57 @@ test('IT4 intake rejects SSRF repo URL before fetching', async () => {
     license: 'MIT', kind: 'agent', name: 'x', owner: 'o', repoRoot: tmp,
   }), /private|ssrf|loopback/i);
 });
+
+// IT5 P0-C: intake failure cleans up clone temp dir + draft half-product.
+test('IT5 P0-C intake failure cleans up clone temp dir + draft half-product', async () => {
+  const tmp = mkTmp();
+  const dest = path.join(tmp, 'clone');
+  // execFile mock that clones successfully, but license check will fail (GPL-3.0).
+  // After the failure, both the clone temp dir and the _drafts/third-party/ dir
+  // should be cleaned up (default behavior — no --keep-on-fail).
+  const r = await assert.rejects(() => intake({
+    repoUrl: 'https://github.com/upstream/pkg.git',
+    license: 'GPL-3.0',
+    kind: 'agent', name: 'rollbackpkg', owner: 'third-party',
+    repoRoot: tmp, execFile: mockExecFile(dest), dest,
+  }), /GPL-3.0|blocked|not allowed/i);
+  // Clone temp dir should be cleaned up.
+  assert.ok(!fs.existsSync(dest), `clone temp dir ${dest} should be cleaned up after failure`);
+  // Draft half-product should NOT exist (scaffold never ran because license blocked first).
+  const draftDir = path.join(tmp, 'packs', '_drafts', 'third-party', 'rollbackpkg');
+  assert.ok(!fs.existsSync(draftDir), 'no draft should exist after license-block rollback');
+});
+
+// IT6 P0-C: intake --keep-on-fail preserves the clone temp dir for debugging.
+test('IT6 P0-C intake keepOnFail preserves clone temp dir', async () => {
+  const tmp = mkTmp();
+  const dest = path.join(tmp, 'clone');
+  await assert.rejects(() => intake({
+    repoUrl: 'https://github.com/upstream/pkg.git',
+    license: 'GPL-3.0',
+    kind: 'agent', name: 'keeppkg', owner: 'third-party',
+    repoRoot: tmp, execFile: mockExecFile(dest), dest,
+    keepOnFail: true,
+  }), /GPL-3.0|blocked|not allowed/i);
+  // With keepOnFail=true, clone temp dir should STILL exist.
+  assert.ok(fs.existsSync(dest), `clone temp dir ${dest} should be preserved with keepOnFail=true`);
+});
+
+// IT7 P0-C: intake scaffold failure cleans up clone + draft.
+test('IT7 P0-C intake scaffold failure cleans up clone + draft', async () => {
+  const tmp = mkTmp();
+  const dest = path.join(tmp, 'clone');
+  // Force scaffold to fail by making repoRoot a path where packs/_drafts/ can't
+  // be created (a file, not a directory). The scaffold call will throw ENOTDIR
+  // when trying to mkdir packs/_drafts/third-party/<name>/.
+  const badRepoRootFile = path.join(tmp, 'blocker-file');
+  fs.writeFileSync(badRepoRootFile, 'not a dir');
+  await assert.rejects(() => intake({
+    repoUrl: 'https://github.com/upstream/pkg.git',
+    license: 'MIT',
+    kind: 'agent', name: 'scaffoldfail', owner: 'third-party',
+    repoRoot: badRepoRootFile, execFile: mockExecFile(dest), dest,
+  }));
+  // Clone temp should be cleaned up (scaffold failed after clone succeeded).
+  assert.ok(!fs.existsSync(dest), 'clone temp dir should be cleaned up after scaffold failure');
+});
