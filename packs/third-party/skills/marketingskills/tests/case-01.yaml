@@ -1,0 +1,14 @@
+name: 顺利识别落地页转化优化任务并套用CRO技能
+input: 帮我优化这个落地页的注册转化率，当前表单提交率偏低
+expect: contains
+expected: 转化优化
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: positive
+source: real
+confidence: high
+allow_exact_reason: null
+ref: https://github.com/coreyhaines31/marketingskills#readme
+# pre_gates: []

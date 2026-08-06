@@ -1,0 +1,14 @@
+name: 负例非召回任务不强行套用召回流程
+input: 帮我把这个 Python 服务的数据库连接池重构成连接复用
+expect: llm_judge
+expected: 代理应识别为非会员召回任务并回退到通用编码能力，不生造召回流程或人群包建议
+schema_ref: null
+judge_rubric: 代理应识别非召回类任务（如数据库连接池重构），不强行套用 member-recall 召回流程，回退到通用编码能力，输出中不含召回/人群包/文案创生等语句。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: https://github.com/noahwang550/member-recall#readme
+# pre_gates: []

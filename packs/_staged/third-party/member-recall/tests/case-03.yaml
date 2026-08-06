@@ -1,0 +1,14 @@
+name: 边界场景数据缺关键字段时降级提示补齐
+input: 会员数据 CSV 里没有最后活跃时间列，没法判断沉睡
+expect: contains
+expected: 提示补齐缺失字段
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: recalled
+confidence: high
+allow_exact_reason: null
+ref: https://github.com/noahwang550/member-recall#readme
+# pre_gates: []

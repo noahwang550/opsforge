@@ -1,0 +1,14 @@
+name: 顺利识别会员召回任务并启动分阶段流程
+input: 我们有一批沉睡会员想激活，大概 3 个月没活跃的，想做一次召回
+expect: contains
+expected: 动机洞察
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: positive
+source: real
+confidence: high
+allow_exact_reason: null
+ref: https://github.com/noahwang550/member-recall#readme
+# pre_gates: []

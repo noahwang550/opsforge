@@ -1,0 +1,14 @@
+name: 负例无对应营销技能时不强制套用框架
+input: 帮我重构这个数据库连接池的代码
+expect: llm_judge
+expected: 代理应识别为非营销任务并回退到通用编码能力，不生造营销建议
+schema_ref: null
+judge_rubric: 代理应识别非营销类任务（如数据库重构），不强行套用marketingskills营销技能，回退到通用编码能力，输出中不含营销建议或框架套用语句。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: https://github.com/coreyhaines31/marketingskills#readme
+# pre_gates: []

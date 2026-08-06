@@ -1,0 +1,10 @@
+{
+  "repo": "https://github.com/noahwang550/member-recall",
+  "commit": "3a42900",
+  "license": "MIT",
+  "intaked_at": "2026-08-06T09:35:05.522Z",
+  "intaked_by": "noahwang550",
+  "commercial": false,
+  "intake_scope": "vendored",
+  "install_hint": "https://github.com/noahwang550/member-recall;skill;member-recall"
+}

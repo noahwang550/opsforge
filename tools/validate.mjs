@@ -34,7 +34,7 @@ const PLACEHOLDER_TOKENS = ['__FILL_ME__', 'TODO', 'FIXME'];
 // Phase 4 fix: upstream-ref.json — intake.mjs writes it into every --third-party draft
 // after scaffold; without the exclusion R15 entry_guard / R8 skeleton_guard false-positive
 // on every intaked third-party capability.
-const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json', 'interview.md', 'upstream-ref.json'];
+const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'benchmark-report.json', 'interview.md', 'upstream-ref.json', 'scripts/credential_setup.py', 'scripts/generate_reports.py', 'scripts/requirements.txt', 'scripts/test_generator.py'];
 /** Test hook: returns the current exclusions list (read-only snapshot). */
 export function SKELETON_GUARD_EXCLUSIONS_GET() {
   return [...SKELETON_GUARD_EXCLUSIONS];

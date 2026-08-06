@@ -1,0 +1,14 @@
+name: 边界场景上游仓库不可达时install降级提示
+input: install marketingskills 时 git 拉取失败，上游仓库不可访问
+expect: contains
+expected: 拉取失败
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: recalled
+confidence: high
+allow_exact_reason: null
+ref: https://github.com/coreyhaines31/marketingskills
+# pre_gates: []

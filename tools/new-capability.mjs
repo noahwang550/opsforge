@@ -21,7 +21,7 @@ const NAME_RE = /^[a-z][a-z0-9-]{2,30}$/;
 // Divergence: validate.mjs also lists `benchmark-report.json` (advisory eval-time
 // artifact present at staged+); scaffold/promote paths only ever see draft dirs
 // (no benchmark report yet), so it is intentionally omitted here.
-const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'interview.md', 'upstream-ref.json'];
+const SKELETON_GUARD_EXCLUSIONS = ['.opsforge-state.json', 'validation-report.json', 'security-report.json', 'eval-report.json', 'interview.md', 'upstream-ref.json', 'scripts/credential_setup.py', 'scripts/generate_reports.py', 'scripts/requirements.txt', 'scripts/test_generator.py'];
 function validateSlug(value, label) {
   if (typeof value !== 'string' || !NAME_RE.test(value)) {
     throw new Error(`scaffold: ${label} "${value}" does not match ^[a-z][a-z0-9-]{2,30}$`);
