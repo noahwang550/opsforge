@@ -46,10 +46,12 @@ node tools/opsforge-bootstrap.mjs --platform claude-code --project default
 
 ### 之后在 Claude Code 平台内（零命令）
 
-- `@opsforge` 或 `@opsforge-wizard` → 6 选项中文菜单（新建/安装/我的能力/诊断/报告/反馈）
+- `@opsforge` 或 `@opsforge-wizard` → 9 选项中文菜单（新建 / 安装 / 我的能力 / 诊断 / 状态 / 反馈 / 发现全部 / 能力目录 / 一键提交）
 - 自然语言："帮我装营销团队包" → 引导式安装（质量灯+商用标签+依赖确认），后台装完出中文绿黄红报告
 - 装完用：`@copywriter` 调子代理、`/workflow-campaign-retrospect` 斜杠命令、MCP 工具直接问数据
+- 浏览全部能力：菜单选 7（发现全部）或选 8（打开能力目录 web 页）；不必先 clone 仓库——discover 优先读远程能力索引，连不上自动回退本地
 - 沉淀一件重复工作成能力：`@capability-interviewer`（引导访谈）→ `@capability-distiller`（蒸馏成骨架+系统提示词）→ 跑通门 → `--promote-case` 并入回归。Tier 2/3 用纯 prompt 脚本 `opsforge-interview` skill 走访谈期。详见 [`docs/methodology/capability-creation.md`](docs/methodology/capability-creation.md)
+- 把本地草稿提交到能力仓：菜单选 9（一键提交）→ 粘贴一次"贡献码"（团队管理员领）→ 自动跑本地体检 + 提 PR；运营团队审核通过后约 2 分钟全员目录可见
 
 ### 其它平台
 
@@ -153,7 +155,16 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 
 ## 状态
 
-Phase 1+2+3+3.6+4 SHIPPED（绿条 489/489，6 道 gate 全绿，10 个能力）。Phase 4 已交付两刀：skill-up 融合（把 `alibaba/skill-up` 可吸收概念内化进 v8 eval harness）+ **能力新建方法论**（访谈→蒸馏→跑通→迭代 5 期流水线，R24–R31 行为门，`@capability-interviewer` / `@capability-distiller` 引导式沉淀）。治理飞轮其余项（`pickVersion` wiring / 远程 registry / 趋势看板 / workflow-runner v0.2）pending。详见 [`PROGRESS.md`](PROGRESS.md)。
+Phase 1+2+3+3.6+4 SHIPPED（绿条 615/615，6 道 gate 全绿，14 个能力）。Phase 4 已交付六刀：
+
+1. **skill-up 融合**——把 `alibaba/skill-up` 可吸收概念内化进 v8 eval harness（pre_gates / turns / check / 回归闭环 / evals 桥接 / benchmark / 多 engine / iteration 归档）
+2. **能力新建方法论**——访谈→蒸馏→跑通→迭代 5 期流水线，R24–R31 行为门，`@capability-interviewer` / `@capability-distiller` 引导式沉淀
+3. **主菜单补第三方收录入口**——菜单选 1→③ 收录第三方能力（来源网址 → intake 治理路径）
+4. **三痛点优化**——固定内容去 AI 化（`opsforge print` 单一真相源）+ 流水线并发提速 + 第三方收录只存来源网址
+5. **能力目录触达 + 一键提交**——菜单选 8 打开能力目录（web catalog）+ 选 9 一键提交草稿到能力仓（贡献码模型，业务用户全程不碰 git）
+6. **远程 index.json 能力索引**——discover / catalog / install 不必 clone 仓库即可浏览已发布能力（GitHub Pages 发布远程索引 + 本地缓存 24h + SSRF 守卫 + repo-less 死循环防御）
+
+治理飞轮其余项（草稿采集 agent / 趋势看板 / `pickVersion` wiring）pending。详见 [`PROGRESS.md`](PROGRESS.md)。
 
 ## 能力新建方法论
 
