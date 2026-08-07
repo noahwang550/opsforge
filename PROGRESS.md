@@ -599,3 +599,39 @@ Phase 1's `validate.mjs` (now R16–R23 + runSuite), `release.mjs` (3-report gat
 3. **新加 validate R-rule 必须全量跑测试**。新增 `R_scenario`（checkScenarioSections，要求 body 含 `## 能力说明` + `## 适用场景`）后，`tools/validate.test.mjs` 的 `makeCap` fixture 和 `tools/new-capability.test.mjs` 的 brand-skill fixture 都因为 body 是纯文本 blob（无 H2 章节）而挂了。**教训：加任何新的 staged+ 验证规则后，必须跑 bare `node --test`（不带 glob）确认所有现有 fixture 仍绿；fixture 写 body 时要包含新规则要求的结构。**
 4. **扫描逻辑要保持一致**。`validate.mjs` 的 `scanCapabilities` 原本只扫 `customers/<brand>/packs/_drafts` 和 `_staged`，漏扫正式品牌目录 `customers/<brand>/packs/<brand-slug>/`，与 `release.mjs` 的 `collectCapDirs` 不一致——导致 inventory 漏掉正式品牌能力，也意味着正式品牌能力从未被 `validate --all` 覆盖。**教训：所有"扫能力目录"的逻辑（validate/release/inventory）扫描范围必须一致，最好共用一个扫描函数。** 本次已对齐 `scanCapabilities` 扫正式品牌目录。
 5. **markdownlint 配置 vs scoping**。`config-protection` hook 会挡对 `.markdownlint.json`（规则配置）的放松改动，要求"改源文件不放松配置"——这是对的纪律。修违规应优先 `markdownlint --fix` 自动修 + 源文件手动修；对确实不该被某规则覆盖的文件（系统提示 body、渲染模板、历史 archive），用 `.markdownlintignore` 做 scoping（不是放松规则）。
+
+## Phase 4 第七刀（WorkBuddy 平台适配 + 平台自动探测）SHIPPED 2026-08-07
+
+6-agent 流水线（planner 2 轮→architect→tdd-guide→e2e-runner→code-reviewer→doc-updater）把 WorkBuddy 作为第 6 个平台适配器落地（Tier 2，data-residency-cn 国产平台），同时把 `detectPlatform` 抽到 `tools/paths.mjs` 成为单一真相源，`install.mjs --platform` 改可选自动探测，减少安装调改，**守住 10 条硬不变量**（零新 npm 依赖 / additionalProperties:false / registry auto-gen / skeleton_guard 不动 / R16–R33 不弱化 / §C.1 / 无 Go / SSRF 全套 detectPlatform 只读本地 / Windows argv / release gate 三报告不动）。
+
+### Slice 清单
+
+- **(S1) platform.yaml** — 新 `adapters/workbuddy/platform.yaml`：Tier 2，`[data-residency-cn]`，9 能力点 `prompt_exec`+`agent_file`+`skill_file`+`mcp_config`+`config_dir_writable`+`kb_mount`+`feedback_hook` supported（无 `slash_command`/`workflow_orchestration`），`model_registration: optional` 删。
+- **(S2) paths.mjs 抽 detectPlatform** — `tools/paths.mjs` 加 `PLATFORM_DIRS` 数据驱动表 + `PLATFORM_MCP_PATHS` + `platformInstallDir`/`mcpConfigPathFor`/`detectPlatform`/`detectAllPlatforms`（加平台只加一行）；新 `tools/paths.platform.test.mjs` PD1-PD6。
+- **(S3) install.mjs --platform 改可选自动探测** — `resolvePlatform(argv)` helper（`OPSFORGE_PLATFORM` env 优先 > 已装平台首个 > `claude-code` 默认）+ `printPlatformHint` helper（多平台/零平台业务话提示，不裸露路径）+ 6 处 `--platform` 改可选 + doctor/repair 去硬编码改用 `platformInstallDir`/`mcpConfigPathFor`；新 `install.platform.test.mjs` DP1-DP3 + AP1-AP2 + CLI1-CLI2。
+- **(S4) adapter.mjs + adapter.test.mjs + README.md** — 新 `adapters/workbuddy/{adapter.mjs,adapter.test.mjs,README.md}`：`WorkBuddyAdapter`，agent→skill(`cli-engine`)/skill→skill/mcp→mcp.json 合并/workflow→引导式 skill(`return []`)，mcp case `mcpConfig=null`；WB1-WB14（14 测试）。
+- **(S5) validate.mjs KNOWN_PLATFORMS + 预加载** — `KNOWN_PLATFORMS` 加 `workbuddy` + 预加载 workbuddy adapter。
+- **(S6) install.mjs workflow 覆盖条件化** — `install.mjs:376` 无条件用 `workflow-compile.mjs` 覆盖 `adapter.translate` 是预存 bug（compile 硬编码 `~/.claude/commands/`），加 `supports('workflow_orchestration')` 守卫修同款 bug；新 `install.workflow.test.mjs` WF1-WF2。
+- **(S7) CLI spawn 测试** — `install.platform.test.mjs` CLI1-CLI2 覆盖 `install --doctor`/`install --list` 真实 spawn 路径（守 test-cli-argv-path-not-just-function 记忆）。
+- **(S8) CI matrix + WC8-WC10** — `.github/workflows/validate.yml` doctor-matrix 加 workbuddy；`tools/opsforge-wording.test.mjs` 加 WC8-WC10 文案守则可执行断言（菜单文案 1-6 选项 / 多平台提示 / 零平台提示）。
+
+设计文档 `docs/design-archive/workbuddy-adaptation-final-design.md`。bare `node --test` 615 → **647**（+32）；6 gates 全绿（14 capabilities）；零新 npm 依赖。
+
+### 关键纠偏
+
+- **架构师 5 处**：(1) `export { x } from './m'` re-export 不创建本地 binding，同文件内调用 `x()` 报 ReferenceError → 改 `import { x } from './m'` + `export { x }` 两步；(2) WorkBuddy frontmatter 规范是 `summary`/`description`/`read_when` 非 `name`/`source`；(3) translate mcp case 形状对齐 cline 审查后改 null；(4) `printPlatformHint` home 路径解析用 `resolveHome`；(5) WB4 frontmatter 正则。
+- **code-reviewer 1 处**：translate mcp case 返 `mcpConfig:{servers:{}}` 死字段——`install.mjs` 的 `injectMcp` 写入的是 `mcpServers` 形状，translate 返回的 `servers` 形状从未被消费 → 删为 `null`（跨平台同源死字段，独立 PR 清理）。
+
+### Lessons learned（WorkBuddy 平台适配会话）
+
+- **u. "re-export 不创建本地 binding"**：`tools/opsforge.mjs` 最初写 `export { detectPlatform } from './paths.mjs'`，同文件内调用 `detectPlatform()` 直接报 `ReferenceError: detectPlatform is not defined`。**教训：`export { x } from './m'` 是 re-export 语法，不创建本地 binding；同文件内要调用 `x`，必须 `import { x } from './m'` 再 `export { x }` 两步。** 已写记忆 `re-export-vs-local-binding`。
+- **v. "平台自动探测的单一真相源"**：`detectPlatform` 原散落在 `opsforge.mjs`/`install.mjs` 各自探测（硬编码 `~/.claude/` 等），加平台要改多处。抽到 `paths.mjs` 的 `PLATFORM_DIRS` 数据驱动表后，加平台只加一行，`detectPlatform`/`detectAllPlatforms`/`platformInstallDir`/`mcpConfigPathFor` 全从它派生。**教训：平台探测的单一真相源是 `PLATFORM_DIRS` 表，放 `paths.mjs`；探测逻辑只读本地文件系统（无 SSRF 面），新增平台只改一行表 + 一个 adapter 目录。** 已写记忆 `platform-autodetect-single-source`。
+- **w. "translate mcpConfig 死字段"**：`WorkBuddyAdapter.translate` mcp case 原返 `mcpConfig:{servers:{}}`，但 `install.mjs injectMcp` 写入 mcp 配置用的是 `mcpServers` 形状——translate 返回的 `mcpConfig` 从未被任何下游消费。单测绿是因为单测自造了 mock 形状，生产死代码。**教训：adapter translate 返回的 mcpConfig 与 injectMcp 写入的 mcpServers 形状不一致是潜在死字段陷阱；install.mjs 不消费 translate mcpConfig 是全平台共有的。** 与既有记忆 `mock-shape-must-match-schema-validated-shape` 同源变体，已补充该记忆。
+- **x. "workflow 覆盖条件化"**：`install.mjs:376` 无条件用 `workflow-compile.mjs` 覆盖 `adapter.translate` 的 workflow artifacts——而 `workflow-compile` 硬编码 `~/.claude/commands/`，对 WorkBuddy（无 `workflow_orchestration` 能力点）会写到错误路径。S6 加 `supports('workflow_orchestration')` 守卫后才条件化。**教训：install 层"无条件覆盖 adapter.translate"是预存 bug 模式——覆盖前必须先查 `adapter.supports(point)`，能力点不支持就跳过，否则跨平台时写到错误路径。**
+
+### 遗留 P2
+
+- **MCP entrypoint=source.md 横切**：WorkBuddy MCP source.md 是全平台共有问题（照抄同侪），独立 PR 横切处理。
+- **逐 cap 加 `platforms:workbuddy`**：现有 14 个 released capability 的 platform matrix 尚未加 workbuddy，待逐 cap 补。
+- **跨平台同源 translate mcpConfig 死字段清理**：cline 返 `{servers:{}}`、workbuddy 返 null——全平台 translate mcpConfig 都不被 install.mjs 消费，独立 PR 统一清理。
+

@@ -30,7 +30,7 @@ jobs:
       - name: Inventory README drift gate (capability inventory SSOT)
         run: node tools/inventory.mjs --check-readme
 
-  # Phase 2.1: per-platform install doctor matrix (claude-code/cursor/codex/cline).
+  # Phase 2.1: per-platform install doctor matrix (claude-code/cursor/codex/cline/workbuddy).
   # Tier-1 platforms must report healthy; Tier-2 platforms only need the adapter
   # to load (detect() may be false when the platform's config dir is absent in CI).
   doctor-matrix:
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [claude-code, cursor, codex, cline, dify]
+        platform: [claude-code, cursor, codex, cline, dify, workbuddy]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

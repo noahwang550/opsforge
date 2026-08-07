@@ -8,13 +8,13 @@ import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveOpsforgeHome, resolveHome, atomicWriteSync, assertCapId, assertSlugSegment } from './paths.mjs';
+import { resolveOpsforgeHome, resolveHome, atomicWriteSync, assertCapId, assertSlugSegment, detectPlatform, detectAllPlatforms } from './paths.mjs';
 import { render } from './report-renderer.mjs';
 import { resolveWorkDir } from './opsforge-runtime.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const PLATFORMS = ['claude-code', 'cursor', 'codex', 'cline', 'dify'];
+const PLATFORMS = ['claude-code', 'cursor', 'codex', 'cline', 'dify', 'workbuddy'];
 
 /**
  * PRINT_TOPICS — 固定内容单一真相源（P0-A）。
@@ -92,27 +92,12 @@ export async function cmdPrint(args = [], opts = {}) {
 }
 
 /**
- * detectPlatform(opts) — 自动探测目标平台（修审计 #4：去硬编码 claude-code）。
- * 遍历 5 个平台 config dir（按 opts.opsforgeHome 或 resolveHome() 解析），返回首个存在的；
- * 均不中则默认 claude-code。MAJOR 2: 修 OP19 空转——改成 lazy 解析（不再用模块级常量），
- * 使 OPSFORGE_HOME 在 import 后设置也能生效。
- * @param {{opsforgeHome?: string}} opts
- * @returns {string} platform id
+ * detectPlatform / detectAllPlatforms — 抽到 tools/paths.mjs（单一真相源
+ * PLATFORM_DIRS），install.mjs 可静态 import（避免反向循环依赖）。
+ * 签名与原 detectPlatform 一致，现有调用点零改动。
+ * 同时 re-export 供外部 import { detectPlatform } from './opsforge.mjs'。
  */
-export function detectPlatform(opts = {}) {
-  const home = opts.opsforgeHome || resolveHome();
-  const dirs = {
-    'claude-code': path.join(home, '.claude'),
-    'cursor': path.join(home, '.cursor'),
-    'codex': path.join(home, '.codex'),
-    'cline': path.join(home, '.cline'),
-    'dify': path.join(home, '.dify'),
-  };
-  for (const p of PLATFORMS) {
-    if (dirs[p] && fs.existsSync(dirs[p])) return p;
-  }
-  return 'claude-code';
-}
+export { detectPlatform, detectAllPlatforms };
 
 /**
  * @param {string[]} argv
@@ -827,8 +812,8 @@ export async function promptInstallFlow(rl, opts = {}) {
   const detected = detectPlatform({ opsforgeHome });
   out(`--- 安装能力 ---\n① 选目标平台：`);
   out(`   [自动检测] 当前平台：${detected}`);
-  out(`   1) claude-code   2) cursor   3) codex   4) cline   5) dify`);
-  const platAns = (await ask('选 [1-5] 或回车用自动检测: ')).trim();
+  out(`   1) claude-code   2) cursor   3) codex   4) cline   5) dify   6) workbuddy`);
+  const platAns = (await ask('选 [1-6] 或回车用自动检测: ')).trim();
   const platform = platAns === '' ? detected : (PLATFORMS[Number(platAns) - 1] || detected);
   // ② 选安装方式
   out(`② 选安装方式：`);

@@ -1,6 +1,6 @@
 # OpsForge
 
-> 一个运营能力仓库 + 多平台适配器 + 安装器：把 agent / skill / mcp / workflow 能力包**一次性安装进任意 AI agent 平台**（Claude Code / Cursor / Codex / Cline / Dify），之后运营人员**在平台内**用原生方式（`@agent` / `/slash` / skill / MCP）消费——日常零命令行。
+> 一个运营能力仓库 + 多平台适配器 + 安装器：把 agent / skill / mcp / workflow 能力包**一次性安装进任意 AI agent 平台**（Claude Code / Cursor / Codex / Cline / Dify / WorkBuddy），之后运营人员**在平台内**用原生方式（`@agent` / `/slash` / skill / MCP）消费——日常零命令行。
 
 [![tests](https://github.com/noahwang550/opsforge/actions/workflows/test.yml/badge.svg)](https://github.com/noahwang550/opsforge/actions/workflows/test.yml)
 [![validate](https://github.com/noahwang550/opsforge/actions/workflows/validate.yml/badge.svg)](https://github.com/noahwang550/opsforge/actions/workflows/validate.yml)
@@ -103,6 +103,7 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | cline | 1 | ✅ 可行 |
 | codex | 2 | ⚠ 部分（manual-paste/http-inject 回退） |
 | dify | 3 | ❌ 退 manual-paste |
+| workbuddy | 2 | ⚠ 部分（agent→skill cli-engine / mcp→mcp.json 合并 / workflow→引导式 skill） |
 
 <!-- opsforge:capability-inventory start -->
 ## 能力清单（自动生成，请勿手动编辑）

@@ -12,6 +12,10 @@ import {
   readJsonOrNullSync,
   assertSlugSegment,
   assertCapId,
+  detectPlatform,
+  detectAllPlatforms,
+  platformInstallDir,
+  mcpConfigPathFor,
 } from './tools/paths.mjs';
 import { assertPublicUrl } from './tools/intake-fetch.mjs';
 import { isOfficialIndexHost } from './tools/index-fetch.mjs';
@@ -239,14 +243,49 @@ function relaxConformForDowngrade(conformResult, cap, adapter) {
   return { ok: relaxed.length === 0, errors: relaxed };
 }
 
+/**
+ * S3: resolvePlatform — 解析 --platform 参数或自动探测。
+ * 优先级：--platform argv > OPSFORGE_PLATFORM env > 已装平台首个 > claude-code 默认。
+ * @param {string[]} argv
+ * @param {{opsforgeHome?: string}} opts
+ * @returns {string} platform id
+ */
+function resolvePlatform(argv, opts = {}) {
+  if (argv && argv.includes('--platform')) {
+    return argv[argv.indexOf('--platform') + 1];
+  }
+  return detectPlatform(opts);
+}
+
+/**
+ * S3: printPlatformHint — 多平台/零平台时打印业务话提示（不报 stack）。
+ * 仅在安装类分支调用；--list/--doctor 不调用。文案守 WC8-WC10。
+ * @param {string} platform  resolved platform
+ * @param {string[]} argv
+ * @param {{out?: Function, opsforgeHome?: string}} opts
+ */
+function printPlatformHint(platform, argv, opts = {}) {
+  if (argv && argv.includes('--platform')) return; // 显式指定不提示
+  if (process.env.OPSFORGE_PLATFORM) return; // env 指定不提示
+  const out = opts.out || console.log;
+  // detectAllPlatforms 用 resolveHome()（OPSFORGE_HOME 根），不是 resolveOpsforgeHome()（~/.opsforge）.
+  const all = detectAllPlatforms();
+  if (all.length > 1) {
+    out(`检测到多个 AI 助手平台已安装：${all.join('、')}。默认安装到 ${platform}。如需指定其他平台，请用 --platform <平台名>。`);
+  } else if (all.length === 0) {
+    out(`未检测到已安装的 AI 助手平台。请用 --platform <平台名> 指定目标平台。可选平台：claude-code / cursor / codex / cline / dify / workbuddy`);
+  }
+}
+
 async function getAdapter(platform) {
-  // Phase 2.1 + F2: dispatch to all 5 platform adapters (incl. dify Tier-3).
+  // Phase 2.1 + F2: dispatch to all platform adapters (incl. dify Tier-3 + workbuddy Tier-2).
   const ADAPTERS = {
     'claude-code': './adapters/claude-code/adapter.mjs',
     'cursor': './adapters/cursor/adapter.mjs',
     'codex': './adapters/codex/adapter.mjs',
     'cline': './adapters/cline/adapter.mjs',
     'dify': './adapters/dify/adapter.mjs',
+    'workbuddy': './adapters/workbuddy/adapter.mjs',
   };
   const modPath = ADAPTERS[platform];
   if (!modPath) {
@@ -333,8 +372,10 @@ export async function install(args) {
   // Translate
   let artifacts = adapter.translate(cap, { platform, brand, project });
 
-  // For workflow: use workflow-compile.mjs, then expand ~ in targetPath (P0-2)
-  if (capYaml.kind === 'workflow') {
+  // For workflow: use workflow-compile.mjs (only when platform supports workflow_orchestration).
+  // S6: 不支持 workflow_orchestration 的平台（workbuddy/cline/codex/dify）走 adapter.translate()
+  // 降级产物（引导式 skill / manual-paste），不再无条件用 compile() 覆盖（compile 硬编码 ~/.claude/commands/）。
+  if (capYaml.kind === 'workflow' && adapter.supports('workflow_orchestration').supported) {
     const { compile } = await import('./tools/workflow-compile.mjs');
     const wfArtifact = compile(capYaml, platform);
     // P0-2: expand ~ at install layer (§5.1), not in workflow-compile (in-memory contract)
@@ -580,7 +621,8 @@ export async function doctor(args) {
   const adapter = await getAdapter(platform);
 
   if (!adapter.detect()) {
-    issues.push({ severity: 'high', check: 'platform_writable', detail: `~/.claude/ not writable or missing`, fix: 'Create ~/.claude/ directory' });
+    const pDir = platformInstallDir(platform);
+    issues.push({ severity: 'high', check: 'platform_writable', detail: `${pDir || platform} 目录不可写或不存在`, fix: `创建 ${pDir || platform} 目录` });
   }
 
   // P0-3: expand ~ in artifact paths before checking existence
@@ -597,12 +639,15 @@ export async function doctor(args) {
     }
   }
 
-  const claudeJsonPath = path.join(resolveHome(), '.claude.json');
-  const claudeJson = readJsonOrNullSync(claudeJsonPath) || { mcpServers: {} };
-  for (const cap of manifest.capabilities) {
-    for (const key of cap.mcp_keys || []) {
-      if (!claudeJson.mcpServers || !claudeJson.mcpServers[key]) {
-        issues.push({ severity: 'medium', check: 'mcp_missing', detail: `MCP server "${key}" for ${cap.id} not in ~/.claude.json`, fix: `Reinstall ${cap.id} or manually add MCP config` });
+  // S3: mcp 检查走 mcpConfigPathFor（dify 无本地 mcp 配置 → 跳过）.
+  const mcpCfgPath = mcpConfigPathFor(platform);
+  if (mcpCfgPath) {
+    const mcpJson = readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} };
+    for (const cap of manifest.capabilities) {
+      for (const key of cap.mcp_keys || []) {
+        if (!mcpJson.mcpServers || !mcpJson.mcpServers[key]) {
+          issues.push({ severity: 'medium', check: 'mcp_missing', detail: `MCP server "${key}" for ${cap.id} not in ${mcpCfgPath}`, fix: `Reinstall ${cap.id} or manually add MCP config` });
+        }
       }
     }
   }
@@ -762,20 +807,22 @@ export async function repair(args) {
     }
     // --repair-mcp: re-inject missing MCP keys
     if (cap.mcp_keys && cap.mcp_keys.length) {
-      const claudeJsonPath = path.join(resolveHome(), '.claude.json');
-      const cfg = readJsonOrNullSync(claudeJsonPath) || { mcpServers: {} };
-      const missingKeys = cap.mcp_keys.filter((k) => !cfg.mcpServers || !cfg.mcpServers[k]);
-      if (missingKeys.length > 0) {
-        try {
-          const capDir = findCapabilitySource(cap.id, repoRoot);
-          if (capDir) {
-            const adapter = await getAdapter(platform);
-            const capObj = { ...parseCapability(capDir), dir: capDir };
-            await adapter.injectMcp(capObj, { platform, project });
-            if (!repaired.includes(cap.id)) repaired.push(cap.id);
+      const mcpCfgPath = mcpConfigPathFor(platform);
+      if (mcpCfgPath) {
+        const cfg = readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} };
+        const missingKeys = cap.mcp_keys.filter((k) => !cfg.mcpServers || !cfg.mcpServers[k]);
+        if (missingKeys.length > 0) {
+          try {
+            const capDir = findCapabilitySource(cap.id, repoRoot);
+            if (capDir) {
+              const adapter = await getAdapter(platform);
+              const capObj = { ...parseCapability(capDir), dir: capDir };
+              await adapter.injectMcp(capObj, { platform, project });
+              if (!repaired.includes(cap.id)) repaired.push(cap.id);
+            }
+          } catch (e) {
+            issues.push({ id: cap.id, check: 'repair_mcp_failed', detail: e.message });
           }
-        } catch (e) {
-          issues.push({ id: cap.id, check: 'repair_mcp_failed', detail: e.message });
         }
       }
     }
@@ -838,7 +885,8 @@ export function main() {
         const idx = argv.indexOf('--install');
         const capIdWithVersion = argv[idx + 1];
         const [capId, version] = capIdWithVersion.split('@');
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
+        printPlatformHint(platform, argv);
         const brand = argv.includes('--brand') ? argv[argv.indexOf('--brand') + 1] : undefined;
         const project = argv.includes('--project') ? argv[argv.indexOf('--project') + 1] : 'default';
         const dryRun = argv.includes('--dry-run');
@@ -852,7 +900,8 @@ export function main() {
         // Phase 2.3: profile install — resolve + install the capability set.
         const idx = argv.indexOf('--profile');
         const profilePath = argv[idx + 1];
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
+        printPlatformHint(platform, argv);
         const project = argv.includes('--project') ? argv[argv.indexOf('--project') + 1] : 'default';
         const useLock = argv.includes('--profile-lock');
         const fresh = argv.includes('--fresh');
@@ -866,7 +915,7 @@ export function main() {
         const idx = argv.indexOf('--uninstall');
         const capIdWithVersion = argv[idx + 1] || '';
         const capId = capIdWithVersion.split('@')[0];
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
         // F1: forward --project + --brand (parity with --install branch); without
         // --project, non-default-project uninstalls silently no-op and leak artifacts.
         const project = argv.includes('--project') ? argv[argv.indexOf('--project') + 1] : 'default';
@@ -876,14 +925,14 @@ export function main() {
         console.log(`uninstalled: ${r.uninstalled.join(', ')}`);
         process.exit(0);
       } else if (argv.includes('--list')) {
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
         const r = await list({ platform });
         for (const c of r.list) {
           console.log(`${c.id}@${c.version}  installed ${c.installed_at}`);
         }
         process.exit(0);
       } else if (argv.includes('--doctor')) {
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
         const r = await doctor({ platform });
         console.log(`healthy: ${r.healthy}`);
         for (const i of r.issues) {
@@ -933,7 +982,7 @@ export function main() {
           console.error('usage: node install.mjs --from-git <url> --kind <kind> --name <name> [--platform <p>] [--project <p>]');
           process.exit(2);
         }
-        const platform = argv.includes('--platform') ? argv[argv.indexOf('--platform') + 1] : 'claude-code';
+        const platform = resolvePlatform(argv);
         const project = argv.includes('--project') ? argv[argv.indexOf('--project') + 1] : 'default';
         const r = await installFromGit(gitUrl, kind, name, { platform, project });
         console.log(`installed from git: ${r.installed.join(', ')}`);

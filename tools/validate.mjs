@@ -1156,7 +1156,7 @@ try {
 }
 
 // The known set of supported platforms (Phase 2.1 + F2 dify).
-const KNOWN_PLATFORMS = new Set(['claude-code', 'cursor', 'codex', 'cline', 'dify']);
+const KNOWN_PLATFORMS = new Set(['claude-code', 'cursor', 'codex', 'cline', 'dify', 'workbuddy']);
 
 function checkPlatformConformance(cap) {
   const y = cap.yaml;
@@ -1192,6 +1192,7 @@ try { _adapterCache['cursor'] = (await import('../adapters/cursor/adapter.mjs'))
 try { _adapterCache['codex'] = (await import('../adapters/codex/adapter.mjs')).adapter; } catch { /* skip */ }
 try { _adapterCache['cline'] = (await import('../adapters/cline/adapter.mjs')).adapter; } catch { /* skip */ }
 try { _adapterCache['dify'] = (await import('../adapters/dify/adapter.mjs')).adapter; } catch { /* skip */ }
+try { _adapterCache['workbuddy'] = (await import('../adapters/workbuddy/adapter.mjs')).adapter; } catch { /* skip */ }
 
 /**
  * validateDir(dir, opts) → { verdict, checks }

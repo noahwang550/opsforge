@@ -183,3 +183,65 @@ export function listDrafts(repoRoot) {
 export function submitTokenPath() {
   return path.join(resolveOpsforgeHome(), 'submit-token.json');
 }
+
+/**
+ * 平台 → 安装根目录名 的单一真相源。加新平台只加一行。
+ * detectPlatform / detectAllPlatforms / platformInstallDir / mcpConfigPathFor 共用。
+ */
+export const PLATFORM_DIRS = {
+  'claude-code': '.claude',
+  'cursor': '.cursor',
+  'codex': '.codex',
+  'cline': '.cline',
+  'dify': '.dify',
+  'workbuddy': '.workbuddy',
+};
+
+/** MCP 配置文件相对 home 的路径（dify 无本地 mcp 配置 → null）。 */
+export const PLATFORM_MCP_PATHS = {
+  'claude-code': '.claude.json',
+  'cursor': '.cursor/mcp.json',
+  'codex': '.codex/config.json',
+  'cline': '.cline/mcp_settings.json',
+  'dify': null,
+  'workbuddy': '.workbuddy/mcp.json',
+};
+
+/** 平台安装根目录绝对路径（未知平台 → null）。 */
+export function platformInstallDir(platform) {
+  const sub = PLATFORM_DIRS[platform];
+  return sub ? path.join(resolveHome(), sub) : null;
+}
+
+/** 平台 MCP 配置文件绝对路径（无本地 mcp 配置的平台 → null）。 */
+export function mcpConfigPathFor(platform) {
+  const sub = PLATFORM_MCP_PATHS[platform];
+  return sub ? path.join(resolveHome(), sub) : null;
+}
+
+/**
+ * detectPlatform(opts) — 自动探测目标平台。
+ * 优先级：OPSFORGE_PLATFORM env > 已装平台首个（按 PLATFORM_DIRS 顺序）> claude-code 默认。
+ * 遍历 PLATFORM_DIRS，返回首个 ~/.<dir> 存在的平台；均不中则默认 claude-code。
+ * 多平台命中时按 PLATFORM_DIRS 定义顺序（Tier1 平台在前）取首个。
+ * @param {{opsforgeHome?: string}} opts
+ * @returns {string} platform id
+ */
+export function detectPlatform(opts = {}) {
+  if (process.env.OPSFORGE_PLATFORM) return process.env.OPSFORGE_PLATFORM;
+  const home = opts.opsforgeHome || resolveHome();
+  for (const [p, sub] of Object.entries(PLATFORM_DIRS)) {
+    if (fs.existsSync(path.join(home, sub))) return p;
+  }
+  return 'claude-code';
+}
+
+/** 返回所有已探测到的平台（多平台场景供业务话提示）。按 PLATFORM_DIRS 顺序。 */
+export function detectAllPlatforms(opts = {}) {
+  const home = opts.opsforgeHome || resolveHome();
+  const out = [];
+  for (const [p, sub] of Object.entries(PLATFORM_DIRS)) {
+    if (fs.existsSync(path.join(home, sub))) out.push(p);
+  }
+  return out;
+}
