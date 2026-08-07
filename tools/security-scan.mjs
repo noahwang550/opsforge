@@ -219,6 +219,55 @@ export function scanRepoForSubmitSecrets(repoRoot) {
   };
 }
 
+/**
+ * scanRepoForIndexFetchSsrf(repoRoot) — R33 仓库级独立函数（Slice AB）.
+ * 扫 tools/index-fetch.mjs + tools/opsforge.mjs + install.mjs 源码确认：
+ *   - fetch(变量) 未经 assertPublicUrl 直接消费 → block
+ *   - fetch 后须 validateIndex/validateCapability/ajv schema 校验 → block
+ * 不进 per-cap scan(capDir) 返回值（守 security-report.json 结构 + additionalProperties:false）.
+ * @param {string} repoRoot
+ * @returns {{verdict: 'pass'|'block', findings: Array, rule: string}}
+ */
+export function scanRepoForIndexFetchSsrf(repoRoot) {
+  const findings = [];
+  const targets = [
+    path.join(repoRoot, 'tools', 'index-fetch.mjs'),
+    path.join(repoRoot, 'tools', 'opsforge.mjs'),
+    path.join(repoRoot, 'install.mjs'),
+  ].filter((p) => fs.existsSync(p));
+  // 捕获 fetch(<变量> ...（含逗号后续参数，如 fetch(detailUrl, { signal })）.
+  const FETCH_VAR_RE = new RegExp("\\bfetch\\s*\\(\\s*[a-zA-Z_$][a-zA-Z0-9_$]*");
+  for (const f of targets) {
+    let content;
+    try { content = fs.readFileSync(f, 'utf8'); }
+    catch { continue; }
+    const rel = path.relative(repoRoot, f).split(path.sep).join('/');
+    if (FETCH_VAR_RE.test(content) && !content.includes('assertPublicUrl')) {
+      findings.push({
+        rule: 'R33_index_fetch_no_user_host',
+        severity: 'high',
+        evidence: rel + ': fetch(变量) 未经 assertPublicUrl SSRF 守卫',
+        status: 'block',
+      });
+    }
+    if (FETCH_VAR_RE.test(content)
+      && !content.includes('validateIndex')
+      && !content.includes('validateCapability')
+      && !content.includes('ajv')) {
+      findings.push({
+        rule: 'R33_index_fetch_no_user_host',
+        severity: 'high',
+        evidence: rel + ': fetch 后无 schema 校验（untrusted data 未守卫）',
+        status: 'block',
+      });
+    }
+  }
+  return {
+    verdict: findings.length > 0 ? 'block' : 'pass',
+    findings,
+    rule: 'R33_index_fetch_no_user_host',
+  };
+}
 /** CLI: `node tools/security-scan.mjs <capDir> | --all` */
 export function main() {
   const argv = process.argv.slice(2);
@@ -251,6 +300,13 @@ export function main() {
         console.log(`BLOCK  ${f.rule}: ${f.evidence}`);
       }
       if (repoScan.verdict === 'block') allPass = false;
+      // Slice AB R33: repo-level index-fetch SSRF scan appended to --all (independent of per-cap).
+      // 必须在 process.exit 之前——否则 R33 是死代码（CL1 防回归，仿 R32 模式）。
+      const r33Scan = scanRepoForIndexFetchSsrf(process.cwd());
+      for (const f of r33Scan.findings) {
+        console.log(`BLOCK  ${f.rule}: ${f.evidence}`);
+      }
+      if (r33Scan.verdict === 'block') allPass = false;
       process.exit(allPass ? 0 : 1);
     })();
   } else {

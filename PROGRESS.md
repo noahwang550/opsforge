@@ -1,4 +1,4 @@
-# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合 + capability-creation 方法论 + 主菜单补第三方收录 + 三痛点优化 + 能力目录触达+一键提交)
+# OpsForge Progress — Phase 0 + Phase 1 + Phase 2 + Phase 3 + Phase 3.6 + Phase 4 (skill-up 融合 + capability-creation 方法论 + 主菜单补第三方收录 + 三痛点优化 + 能力目录触达+一键提交 + 远程 index.json 能力索引)
 
 > Living progress doc. Updated by the doc-updater at pipeline close.
 > **Last Updated:** 2026-08-06
@@ -537,9 +537,42 @@ Distilled from the Phase 3.6 fix-pass (tdd-guide + e2e-runner + code-reviewer + 
 
 **Phase 4 第一刀（skill-up 融合）SHIPPED 2026-07-27。** 其余 governance flywheel 项仍 pending：
 
+## Phase 4 第六刀（远程 index.json 能力索引）SHIPPED 2026-08-07
+
+6-agent 流水线（规划+业务评审→架构→tdd→e2e→review→文档）把 `registry.yaml` 演进为远程 `index.json`（PLAN.md §15 Phase 4 治理飞轮条目 + §22.12 "随 v7 remote index.json 一起演进"），让 discover（CLI 文本）+ 能力目录（web catalog）+ install 元数据回退**不必 clone 仓库**就能浏览/部分安装已发布能力，**守住 10 条硬不变量**（零新 npm 依赖 / additionalProperties:false / registry auto-gen / skeleton_guard 两处不动 / R16–R32 不弱化 + R33 同级独立 / §C.1 / 无 Go / SSRF 全套含缓存命中回退 / Windows argv / release gate 三报告不动）。
+
+### Slice 清单
+
+- **(A1) index 生成** — 新 `tools/index-publish.mjs` `buildIndex` 复用 `catalog-model.mjs buildCatalogSnapshot`（同源无双 SSOT）→ 产出 `index.json`（`catalogSummary` 轻量列表形）+ `capabilities/<id>.json`（完整 `publicEntry` + `installHint`，镜像 catalog-server API 契约，零数据形状改动）+ `schema/index.schema.json`（untrusted data ajv 校验，`additionalProperties:false` 全保留）。
+- **(A2) index 拉取** — 新 `tools/index-fetch.mjs` `fetchRemoteIndex`（Node 内置 fetch + `AbortController` 5s 超时 + 24h TTL 缓存 + `assertPublicUrl` SSRF + ajv schema 校验）+ `isOfficialIndexHost`（host 白名单 `github.io` 后缀匹配）+ `officialIndexUrl`（git remote 派生）+ `readCacheIndex`（离线降级）+ `OPSFORGE_INDEX_URL`/`OPSFORGE_INDEX_TTL` env 覆盖。
+- **(B1) discover 远程优先** — `cmdDiscover` 远程优先 + 本地回退 + **repo-less 死循环防御**（远程失败 + 仓库不在 → 不提示"主菜单选 8"避免二次失败）+ `PRINT_TOPICS['discover-remote-hint']`。
+- **(B2) CI 发布** — 新 `.github/workflows/publish-index.yml` `workflow_run` 链式触发（`opsforge-release` 成功后跑 → `inventory --readme` + `index-publish` + `actions/deploy-pages`）+ `web/catalog/dist/` gitignore。
+- **(C1) install 远程回退** — `install.mjs` `lookupRemoteCapability`（远程 index 元数据回退，只补 version/pack/kind/source/installHint，不补源码位置）+ `RemoteHintError`/`RemoteNotFoundError`（third-party 走 `installFromGit`，官方无仓库走业务话"联系团队管理员装一次"）+ detail-fetch（`capabilities/<id>.json` 懒加载）+ `isOfficialIndexHost` 复用守缓存命中回退路径。
+- **(C2) catalog launcher host 白名单** — `tools/opsforge-catalog-launcher.mjs` host 白名单扩 `.github.io` 后缀（仿第五刀 `127.0.0.1` 模式）。
+- **(D1) 静态 catalog 站点** — `web/catalog/app.js` 静态模式自动探测（`location.hostname.endsWith('.github.io')` → fetch `./index.json` + `./capabilities/<id>.json`）+ "● 已连上能力仓"绿点徽章（`connection-badge`，hidden 默认，loadCatalog 成功才显，不显 URL/host）。
+- **(AB) R33 + 文案断言** — R33 `scanRepoForIndexFetchSsrf` 独立仓库级函数扫 `tools/index-fetch.mjs`+`tools/opsforge.mjs`+`install.mjs`（`FETCH_VAR_RE` 正则捕 `fetch(变量 ...` 含多参数调用，不经 `assertPublicUrl` 即 block，不进 per-cap `scan()` 返回值守 security-report.json 结构，`--all` 末尾在 `process.exit` 前调仿 R32 防死代码）+ WC5-WC7 文案守则可执行断言。
+
+设计文档 `docs/design-archive/remote-index-registry-proposal.md` + `remote-index-architecture.md`。bare `node --test` 574 → **615**（+41）；6 gates 全绿（14 capabilities）；零新 npm 依赖。
+
+### 缺陷修复
+
+- **e2e-runner 抓 1 runtime 缺陷**：`lookupRemoteCapability` `installHint` 死代码——单测 mock 给 summary 项塞了 schema `additionalProperties:false` 会拒的 `installHint` 字段，单测绿但生产 fetch 真实 index.json（ajv 校验过）恒无该字段 → 死代码。修为读 `capabilities/<id>.json` detail 文件。
+- **code-reviewer 抓 3 缺陷**：
+  - **HIGH（SSRF 缓存命中绕过）**：`fetchRemoteIndex` 缓存命中时不跑 `assertPublicUrl`（resolvedUrl=null），install detail-fetch 从 env 派生 base 时 SSRF 失效。修为 `isOfficialIndexHost` 守卫缓存命中+env 覆盖回退路径。
+  - **MEDIUM（R33 正则过窄）**：`FETCH_VAR_RE` 只匹配 `fetch(var)` 单参数，漏 `fetch(var, args)` 多参数调用。修为 `\bfetch\s*\(\s*[a-zA-Z_$][a-zA-Z0-9_$]*` 不要求闭括号。
+  - **LOW（usage schema 开放）**：`usage` schema `additionalProperties` 过开放。修为 `$ref` usageValue + `additionalProperties:false` 收紧。
+
+### Lessons learned（远程 index.json 能力索引会话）
+
+- **r. "mock 绕过 schema 校验掩盖死代码"**：`install-remote-lookup` 单测给 mock summary 项塞了 `installHint` 字段——而 schema `additionalProperties:false` 会拒该字段，单测绿但生产 fetch 真实 index.json（ajv 校验过）恒无 `installHint` → 死代码。**教训：测远程数据消费时，mock 形状必须用真 ajv 校验过的 schema 形状，不能自造字段；否则 mock 通过但生产恒无该字段→死代码。** 与既有记忆 `test-cli-argv-path-not-just-function`（validateCapability 同型问题）同源，是它的变体再现。
+- **s. "SSRF 守卫的缓存命中盲区"**：`fetchRemoteIndex` 缓存命中时直接返回，不跑 `assertPublicUrl`（resolvedUrl=null）；install detail-fetch 从 env `OPSFORGE_INDEX_URL` 派生 base 时若 env 被设成私网地址，SSRF 失效。**教训：SSRF 守卫须覆盖"缓存命中 + env 覆盖"的回退路径，不能只守 fetch 主路径；任何从 env/配置派生 URL 的下游消费点都要复用同一 host 白名单判定（`isOfficialIndexHost`）。**
+- **t. "安全扫描正则别只匹配单参数调用"**：R33 `FETCH_VAR_RE` 最初只匹配 `fetch(var)` 单参数形式，`fetch(detailUrl, { signal })` 多参数调用被漏掉。**教训：安全扫描正则要覆盖多参数调用形式——用 `\bfetch\s*\(\s*<var>` 不要求闭括号，能同时捕获单参+多参；只匹配到闭括号 `fetch(var)` 会漏掉带 options 的调用。**
+
+**Phase 4 第一刀（skill-up 融合）SHIPPED 2026-07-27。** 其余 governance flywheel 项仍 pending：
+
 - **Phase 4 其余 — governance flywheel** (per IMPLEMENTATION-PLAN.md)。Scope TBD by steering; expected to cover cross-cap dependency-graph dashboards, contributor reputation scoring, automated capability lifecycle (deprecate/sunset), and the `opsforge-feedback` MCP telemetry loop closure at scale。
 - **草稿采集 agent**（帮运营把对话/产出转成草稿投到 `_drafts/`，走 `new-capability.mjs` 入口）— Phase 4 §15 条目，未交付。
-- **`registry.yaml` / `registry-brands.yaml` 演进为远程 `index.json`** + `pickVersion` semver-range intersection wiring — deferred by steering 2026-07-24，随远程 registry 一起演进。
+- **`registry.yaml` / `registry-brands.yaml` 演进为远程 `index.json`** — SHIPPED 2026-08-07（第六刀）：`tools/index-publish.mjs` 生成 `index.json` + `capabilities/<id>.json`，`tools/index-fetch.mjs` 拉取+缓存+SSRF+schema 校验，`.github/workflows/publish-index.yml` `workflow_run` 链式发布到 GitHub Pages，discover/catalog/install 不必 clone 仓库。`pickVersion` semver-range intersection wiring 仍 deferred，随下一刀 governance flywheel 演进。
 - **Steering decisions — all 4 CONFIRMED 2026-07-24 (no open steering items):**
   1. **Tier2-min** — RESOLVED + shipped: `adapters/base.mjs tier()` tightened to §22.3 "至少 2 个文件/配置类" (Tier2 = prompt_exec + ≥2 of the other 5; else Tier3). Test `A1c`. No platform hits the edge today, but the spec is now honest.
   2. **`pickVersion` wiring** — DEFERRED to Phase 4 by steering: `tools/resolve-profile.mjs` keeps single-version registry pin; full semver-range intersection lands with the remote `index.json` registry (Phase 4).

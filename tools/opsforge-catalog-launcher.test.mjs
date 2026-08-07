@@ -142,3 +142,52 @@ test('CL6 openInBrowser rejects url containing double-quote', () => {
     assert.ok(lines.some((s) => s.includes('主菜单选 8')));
   } finally { restore(); }
 });
+
+// Slice C2: 远程能力广场 host 白名单——<owner>.github.io 后缀匹配通过，其他 host 拒绝.
+test('C2-CL1 openInBrowser accepts <owner>.github.io host (suffix match)', () => {
+  const restore = setPlatform('linux');
+  let captured = null;
+  try {
+    const ok = openInBrowser('https://acme.github.io/opsforge/', {
+      spawn: (cmd, args) => { captured = { cmd, args }; return { unref: () => {} }; },
+      out: () => {},
+    });
+    assert.equal(ok, true);
+    assert.equal(captured.args[0], 'https://acme.github.io/opsforge/');
+  } finally { restore(); }
+});
+
+test('C2-CL2 openInBrowser rejects non-github.io external host', () => {
+  let spawned = false;
+  const lines = [];
+  const ok = openInBrowser('https://evil.com/opsforge/', {
+    spawn: () => { spawned = true; return { unref: () => {} }; },
+    out: (s) => lines.push(s),
+  });
+  assert.equal(ok, false);
+  assert.equal(spawned, false);
+  assert.ok(lines.some((s) => s.includes('主菜单选 8') || s.includes('能力目录')));
+});
+
+test('C2-CL3 openInBrowser rejects github.io spoof host (not suffix)', () => {
+  let spawned = false;
+  const ok = openInBrowser('https://github.io.evil.com/', {
+    spawn: () => { spawned = true; return { unref: () => {} }; },
+    out: () => {},
+  });
+  assert.equal(ok, false);
+  assert.equal(spawned, false);
+});
+
+test('C2-CL4 openInBrowser win32 still double-quotes github.io url (H3 retained)', () => {
+  const restore = setPlatform('win32');
+  let captured = null;
+  try {
+    openInBrowser('https://acme.github.io/opsforge/?x=1&y', {
+      spawn: (cmd, args) => { captured = { cmd, args }; return { unref: () => {} }; },
+      out: () => {},
+    });
+    assert.ok(captured.args[3].startsWith('"'), 'remote url must be double-quoted on win32');
+    assert.ok(captured.args[3].includes('&'));
+  } finally { restore(); }
+});

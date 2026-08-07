@@ -28,3 +28,6 @@ Thumbs.db
 
 # 贡献码（B2）：本文件绝不进 git，贡献码只存 ~/.opsforge/submit-token.json
 submit-token.json
+
+# Slice B2: 静态能力目录产物（由 CI index-publish 重新生成，不进 git）
+web/catalog/dist/

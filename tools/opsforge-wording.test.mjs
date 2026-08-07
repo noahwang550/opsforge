@@ -5,12 +5,14 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { promptInstallFlow } from './opsforge.mjs';
 
-const FORBIDDEN_RE = /PAT|Personal Access Token|github\.com\/settings|Developer settings|repo 权限|\bPR\b|pull request|branch|commit|install|steering review|\bCI\b|\breview\b|\bbot\b|127\.0\.0\.1|\/capabilities\/|opsforge submit </;
+const FORBIDDEN_RE = /PAT|Personal Access Token|github\.com\/settings|Developer settings|repo 权限|\bPR\b|pull request|branch|commit|install|steering review|\bCI\b|\breview\b|\bbot\b|127\.0\.0\.1|\/capabilities\/|opsforge submit <|index\.json|registry|gh-pages|\bfetch\b|\bcache\b|\bTTL\b|raw\.githubusercontent|jsdelivr|\bCDN\b|\bhost\b|\bendpoint\b|\bclone\b|\brepo\b|git\s*地址|git\s*address|git\s*URL/;
 
 const SCRIPT = fileURLToPath(import.meta.url).replace(/opsforge-wording\.test\.mjs$/, 'opsforge.mjs');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function runPrint(topic) {
   const r = spawnSync(process.execPath, [SCRIPT, 'print', topic], { encoding: 'utf8', timeout: 20000 });
@@ -70,4 +72,48 @@ test('WC4 install flow prints clickable deep link when server running', async ()
   });
   const text = out.join('\n');
   assert.match(text, /http:\/\/127\.0\.0\.1:4173\/capabilities\/foo\.bar/);
+});
+
+// WC6: catalog 远程站点徽章文案无禁用词（读 index.html 徽章 + app.js 文本）.
+test('WC6 catalog connection badge wording has no forbidden words', () => {
+  const html = fs.readFileSync(path.join(REPO_ROOT, 'web', 'catalog', 'index.html'), 'utf8');
+  // 徽章含"已连上能力仓".
+  assert.match(html, /已连上能力仓/);
+  // 徽章不含 URL/host/响应码.
+  const badgeMatch = html.match(/<span[^>]*connection-badge[^>]*>([^<]*)<\/span>/);
+  assert.ok(badgeMatch, 'connection-badge element must exist');
+  assert.doesNotMatch(badgeMatch[1], /https?:|index\.json|200|404|host/i);
+  assert.doesNotMatch(badgeMatch[1], FORBIDDEN_RE);
+});
+
+// WC7: install 边界提示——third-party 含"来源网址"不含"git"; 官方无仓库含"联系团队管理员"+"装一次"不含 clone/仓库/下到本地.
+test('WC7 install boundary hints use business wording', async () => {
+  const { RemoteHintError, RemoteNotFoundError } = await import('../install.mjs');
+  // third-party + installHint 边界.
+  {
+    const out = [];
+    const rl = mockRl(['', '', 'foo.bar', 'y']);
+    await promptInstallFlow(rl, {
+      dryRun: false, out: (s) => out.push(String(s)), workDir: REPO_ROOT,
+      install: async () => { throw new RemoteHintError({ installHint: 'https://x.git', kind: 'skills', name: 'foo' }); },
+    });
+    const text = out.join('\n');
+    assert.match(text, /来源网址/);
+    assert.doesNotMatch(text, /\bgit\b/i, 'third-party boundary must not mention git');
+    assert.doesNotMatch(text, FORBIDDEN_RE);
+  }
+  // 官方无仓库边界.
+  {
+    const out = [];
+    const rl = mockRl(['', '', 'foo.bar', 'y']);
+    await promptInstallFlow(rl, {
+      dryRun: false, out: (s) => out.push(String(s)), workDir: REPO_ROOT,
+      install: async () => { throw new RemoteNotFoundError({ capId: 'foo.bar' }); },
+    });
+    const text = out.join('\n');
+    assert.match(text, /联系团队管理员/);
+    assert.match(text, /装一次/);
+    assert.doesNotMatch(text, /clone|仓库|下到本地/i, 'official boundary must not give impossible instructions');
+    assert.doesNotMatch(text, FORBIDDEN_RE);
+  }
 });

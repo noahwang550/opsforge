@@ -45,7 +45,7 @@ const PRINT_TOPICS = {
     '推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。',
     '  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）',
     '  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）',
-    '  ③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）',
+    '  ③ 收录第三方能力（粘贴来源网址，自动收录）',
   ].join('\n'),
   'wizard-routing': [
     'OpsForge 向导 — 引导式创建能力',
@@ -54,6 +54,7 @@ const PRINT_TOPICS = {
   ].join('\n'),
   'push-reminder': '📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。',
   'catalog-hint': '想看这能力的详情？主菜单选 8 打开能力目录。',
+  'discover-remote-hint': '想看全部能力？主菜单选 8 打开能力目录，或直接跑 opsforge discover。',
   'submit-hint': '建好了？回主菜单选 9 一键提交到能力仓（让其他人能下载）。',
   'submit-flow': [
     '--- 提交我的能力到能力仓 ---',
@@ -286,10 +287,31 @@ export function printSubmitHint() {
 export async function cmdCatalogFlow(rl, opts = {}) {
   const ask = (q) => new Promise((r) => rl.question(q, r));
   const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
-  const { startCatalogServer } = await import('./catalog-server.mjs');
-  const start = opts.startServer || startCatalogServer;
   const { openInBrowser } = await import('./opsforge-catalog-launcher.mjs');
   const open = opts.openBrowser || openInBrowser;
+  // C2: 仓库在→本地 server；仓库不在→远程探测.
+  const repoPresent = ['templates', 'schema', 'tools'].every((d) => fs.existsSync(path.join(workDir, d)));
+  if (!repoPresent) {
+    // repo-less：探测远程可达.
+    const fetchFn = opts.fetchRemoteIndex || (await import('./index-fetch.mjs')).fetchRemoteIndex;
+    const officialUrl = opts.officialIndexUrl || (await import('./index-fetch.mjs')).officialIndexUrl;
+    try {
+      const url = process.env.OPSFORGE_INDEX_URL || officialUrl({ repoRoot: workDir });
+      await fetchFn({ url, refresh: false });
+      // 远程可达 → 打开远程站点（URL 去掉 /index.json 换 /）.
+      const catalogUrl = url.replace(/\/index\.json$/, '/');
+      open(catalogUrl);
+      console.log('已打开能力广场（在线版），看完关掉浏览器回这里按回车。');
+      await ask('按回车回到主菜单…');
+    } catch {
+      // 远程不可达 → 不起浏览器，业务话兜底，不提示选 8（避免死循环）.
+      console.log('能力广场暂时打不开，可能还没准备好。稍后再试，或联系团队管理员。');
+    }
+    return 0;
+  }
+  // 仓库在→照旧起本地 server.
+  const { startCatalogServer } = await import('./catalog-server.mjs');
+  const start = opts.startServer || startCatalogServer;
   let server;
   try {
     const { server: srv } = await start({ port: 0, host: '127.0.0.1', repoRoot: workDir });
@@ -484,6 +506,38 @@ export async function cmdWizard(rl, opts = {}) {
   return 0;
 }
 
+/** B1: 把远程 index.json 的 summary capabilities（publicEntry 子集）映射成
+ *  renderDiscoverAll 兼容的 inventory entry 形. 远程清单全是 released 态. */
+const QUALITY_TO_LIGHT = { green: '绿', yellow: '黄', red: '红' };
+function indexToInventory(index) {
+  const entries = (index.capabilities || []).map((cap) => ({
+    id: cap.id,
+    version: cap.version,
+    kind: cap.kind,
+    pack: cap.pack,
+    display_name_zh: cap.name,
+    display_name_en: cap.nameEn,
+    description: cap.description,
+    detail: cap.detail || cap.description || '',
+    scenarios: (cap.scenarios || []).join('\n'),
+    scenarioTag: cap.scenarioTag,
+    scope: cap.scope,
+    project: cap.project,
+    sourceOrigin: cap.source && cap.source.key === 'third-party' ? 'third-party' : 'original',
+    example: cap.availability === 'reference-only',
+    light: QUALITY_TO_LIGHT[cap.quality] || '黄',
+    state: 'released',
+    platformSupport: (cap.platformSupport || []).map((p) => ({
+      platform: p.platform, tier: p.tier, hardUnmet: [],
+    })),
+  }));
+  return {
+    all: entries,
+    general: entries.filter((e) => e.scope !== 'project'),
+    brands: {},
+  };
+}
+
 /** opsforge discover — §22.10 改读 per-project manifest（修审计 #1 语义错）。
  *  渲染质量灯 + [黄 不可商用] 商用标签 + 触发方式。
  *  `discover --all`：全局仓库能力总览（从 registry + body H2 章节派生），
@@ -495,9 +549,30 @@ export async function cmdDiscover(argsOrOpts) {
   if (opts.all) {
     const { buildInventory, renderDiscoverAll } = await import('./inventory.mjs');
     const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
-    const inv = await buildInventory({ repoRoot: workDir, includeDrafts: !!opts.includeDrafts });
-    console.log(renderDiscoverAll(inv, { lang: 'zh' }));
-    return 0;
+    const repoPresent = ['templates', 'schema', 'tools'].every((d) => fs.existsSync(path.join(workDir, d)));
+    // B1: 远程优先.
+    const fetchFn = opts.fetchRemoteIndex || (await import('./index-fetch.mjs')).fetchRemoteIndex;
+    const officialUrl = opts.officialIndexUrl || (await import('./index-fetch.mjs')).officialIndexUrl;
+    try {
+      const url = process.env.OPSFORGE_INDEX_URL || officialUrl({ repoRoot: workDir });
+      const { index } = await fetchFn({ url, refresh: !!opts.refresh });
+      // index.capabilities (summary 形) → renderDiscoverAll 兼容的 entry 形.
+      const inv = indexToInventory(index);
+      console.log(`● 已连上能力仓（共 ${index.count} 项能力）`);
+      console.log(renderDiscoverAll(inv, { lang: 'zh' }));
+      return 0;
+    } catch {
+      // 失败 + 仓库在 → 本地回退.
+      if (repoPresent) {
+        console.log('○ 暂时连不上能力仓，显示本地已装能力。');
+        const inv = await buildInventory({ repoRoot: workDir, includeDrafts: !!opts.includeDrafts });
+        console.log(renderDiscoverAll(inv, { lang: 'zh' }));
+        return 0;
+      }
+      // 失败 + repo-less → 不提示"主菜单选 8"（那也会失败，避免死循环）.
+      console.log('○ 暂时连不上能力仓，稍后再试或联系团队管理员。');
+      return 0;
+    }
   }
   const project = opts.project || 'default';
   const opsforgeHome = opts.opsforgeHome || resolveOpsforgeHome();
@@ -773,13 +848,22 @@ export async function promptInstallFlow(rl, opts = {}) {
   }
   // 执行安装（转发 install.mjs）
   if (!opts.dryRun) {
-    const { install } = await import('../install.mjs');
+    const { install, RemoteHintError, RemoteNotFoundError } = await import('../install.mjs');
     const workDir = opts.workDir || resolveWorkDir({ opsforgeHome }).dir;
+    const installFn = opts.install || install;
     try {
-      const r = await install({ platform, capId, project: opts.project || 'default', repoRoot: workDir, opsforgeHome });
+      const r = await installFn({ platform, capId, project: opts.project || 'default', repoRoot: workDir, opsforgeHome });
       out(`绿 安装完成：${r.installed.join(', ')}`);
     } catch (e) {
-      out(`[红] 安装失败：${e.message}`);
+      if (e?.name === 'RemoteHintError') {
+        // 第三方能力 + installHint：指向 installFromGit，对用户只说"来源网址"不出现 git 字样.
+        out(`这能力来自社区。要装到本地，请回主菜单选 2，把来源网址粘贴进去即可。`);
+      } else if (e?.name === 'RemoteNotFoundError') {
+        // 官方能力无仓库：业务话，不给用户做不到的指令.
+        out(`这能力在能力仓里找到了。要装到本地，需要团队管理员先帮你装一次（只需一次）。请联系团队管理员。`);
+      } else {
+        out(`[红] 安装失败：${e.message}`);
+      }
     }
   }
   // A2 深链可见性规则：server 在跑→可点击链接；未跑→业务指引（不裸露 URL）。

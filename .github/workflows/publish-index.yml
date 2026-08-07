@@ -1,0 +1,41 @@
+name: opsforge-publish-index
+# Slice B2: push to main 后发布远程 index.json + 静态能力目录到 GitHub Pages.
+# workflow_run 链式触发：在 opsforge-release 完成后跑（确保读到含新 registry.yaml 的 main）.
+# 不重复 release，只做 index 发布（inventory --readme + index-publish + deploy-pages）.
+on:
+  workflow_run:
+    workflows: [opsforge-release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  publish-index:
+    runs-on: ubuntu-latest
+    # 仅 release 成功时跑（非 failure/neutral）.
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/configure-pages@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - name: Refresh README inventory block
+        run: node tools/inventory.mjs --readme
+      - name: Build index.json + capabilities
+        run: node tools/index-publish.mjs --out-dir web/catalog/dist
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/catalog
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

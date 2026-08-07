@@ -13,6 +13,8 @@ import {
   assertSlugSegment,
   assertCapId,
 } from './tools/paths.mjs';
+import { assertPublicUrl } from './tools/intake-fetch.mjs';
+import { isOfficialIndexHost } from './tools/index-fetch.mjs';
 import { parseCapability } from './tools/validate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +97,110 @@ function findCapabilitySource(capId, repoRoot) {
 
 // P1-B: export findCapabilitySource for installFromGit + tests.
 export { findCapabilitySource };
+
+/** Slice C1: 第三方能力远程边界——installHint 可走 installFromGit，对用户只说"来源网址". */
+export class RemoteHintError extends Error {
+  constructor({ installHint, kind, name }) {
+    super(`install: capability "${name}" is third-party with a remote source`);
+    this.name = 'RemoteHintError';
+    this.installHint = installHint;
+    this.kind = kind;
+    this.capName = name;
+  }
+}
+
+/** Slice C1: 官方能力在无仓库机器上无法 install——业务话提示联系团队管理员. */
+export class RemoteNotFoundError extends Error {
+  constructor({ capId }) {
+    super(`install: capability "${capId}" found in remote index but no local repo to install from`);
+    this.name = 'RemoteNotFoundError';
+    this.capId = capId;
+  }
+}
+
+/**
+ * lookupRemoteCapability(capId, opts) — Slice C1: 远程 index 元数据回退.
+ * 只补 version/pack/kind/source/installHint 元数据，不补源码位置.
+ * @param {string} capId
+ * @param {{repoRoot?: string, fetchImpl?: Function, fetchRemoteIndex?: Function,
+ *          officialIndexUrl?: Function, readCacheIndex?: Function, opsforgeHome?: string}} opts
+ * @returns {Promise<{version?: string, pack?: string, kind?: string,
+ *   source?: {key: string, label: string}, installHint?: string}|null>}
+ */
+export async function lookupRemoteCapability(capId, opts = {}) {
+  assertCapId(capId);
+  const cacheDir = path.join(opts.opsforgeHome || resolveOpsforgeHome(), 'cache');
+  // 注入点供测试；默认动态 import index-fetch.mjs.
+  const readCache = opts.readCacheIndex || (async () => {
+    const m = await import('./tools/index-fetch.mjs');
+    return m.readCacheIndex(cacheDir);
+  });
+  const fetchIdx = opts.fetchRemoteIndex || (async (a) => {
+    const m = await import('./tools/index-fetch.mjs');
+    return m.fetchRemoteIndex(a);
+  });
+  const officialUrl = opts.officialIndexUrl || (async (a) => {
+    const m = await import('./tools/index-fetch.mjs');
+    return m.officialIndexUrl(a);
+  });
+  // 先读缓存（不强制 TTL，离线降级）.
+  let index = typeof readCache === 'function' ? readCache(cacheDir) : null;
+  if (typeof index?.then === 'function') index = await index;
+  let resolvedUrl = null;
+  if (!index) {
+    try {
+      resolvedUrl = process.env.OPSFORGE_INDEX_URL || await officialUrl({ repoRoot: opts.repoRoot });
+      const r = await fetchIdx({ url: resolvedUrl, cacheDir });
+      index = r.index;
+    } catch {
+      // 远程不可达 + 无缓存 → null（install 上层处理边界）.
+      return null;
+    }
+  }
+  const cap = (index.capabilities || []).find((c) => c.id === capId);
+  if (!cap) return null;
+  // index.json 是 summary 形（schema additionalProperties:false，无 installHint 字段）.
+  // installHint 只存于 capabilities/<id>.json（完整 publicEntry + installHint）.
+  // 单元测试若在 summary 项塞 installHint 会被 schema 拒（production 永远拿不到）→ 必须读 detail 文件.
+  // SSRF 守卫（设计 §2.10）：detail URL 若来自 env 覆盖（缓存命中时 resolvedUrl=null 回退到 env）
+  // 必须经 assertPublicUrl 全套；官方源（github.io 白名单）可信不经.
+  const fetchDetail = opts.fetchCapDetail || (async (detailUrl) => {
+    if (!isOfficialIndexHost(detailUrl)) {
+      await assertPublicUrl(detailUrl);
+    }
+    const { validateCapability } = await import('./tools/index-publish.mjs');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      const resp = await globalThis.fetch(detailUrl, { signal: controller.signal });
+      if (!resp || !resp.ok) return null;
+      const json = await resp.json();
+      return validateCapability(json) ? json : null;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+  let detailUrl = null;
+  try {
+    const base = (resolvedUrl || process.env.OPSFORGE_INDEX_URL || await officialUrl({ repoRoot: opts.repoRoot })).replace(/\/index\.json$/, '/');
+    detailUrl = `${base}capabilities/${encodeURIComponent(capId)}.json`;
+  } catch {
+    // 官方 URL 派生失败（非 git 仓库）→ 无 detail 可读，installHint=null.
+  }
+  let detail = null;
+  if (detailUrl) {
+    try { detail = await fetchDetail(detailUrl); } catch { detail = null; }
+  }
+  return {
+    version: cap.version,
+    pack: cap.pack,
+    kind: cap.kind,
+    source: cap.source,
+    installHint: detail?.installHint || null,
+  };
+}
 
 function getManifestPath(project, opsforgeHome) {
   const manifestsDir = path.join(opsforgeHome || resolveOpsforgeHome(), 'manifests');
@@ -183,6 +289,20 @@ export async function install(args) {
 
   const capDir = args.capDir || findCapabilitySource(capId, repoRoot);
   if (!capDir) {
+    // Slice C1: 远程元数据回退——本地无仓库时查远程 index.
+    if (capId) {
+      const remoteMeta = await lookupRemoteCapability(capId, { repoRoot, opsforgeHome });
+      if (remoteMeta) {
+        if (remoteMeta.source && remoteMeta.source.key === 'third-party' && remoteMeta.installHint) {
+          // 指向 installFromGit，对用户只说"来源网址".
+          const [packSeg, nameSeg] = capId.split('.');
+          const kindDir = `${remoteMeta.kind}s`;
+          throw new RemoteHintError({ installHint: remoteMeta.installHint, kind: kindDir, name: nameSeg });
+        }
+        // 官方能力无仓库——业务话边界.
+        throw new RemoteNotFoundError({ capId });
+      }
+    }
     // NIT 8: stable error code so callers can match by type, not message text.
     const err = new Error(`install: capability "${capId}" not found in repository`);
     err.code = 'ENOCAPSOURCE';
