@@ -250,8 +250,7 @@ test('A9 translate() produces mcp-config-merge artifact', async () => {
   const artifacts = a.translate(cap);
   assert.equal(artifacts.length, 1);
   assert.equal(artifacts[0].kind, 'mcp-config-merge');
-  assert.ok(artifacts[0].mcpConfig.servers.connector, JSON.stringify(artifacts[0].mcpConfig));
-  assert.equal(artifacts[0].mcpConfig.servers.connector.env.API_KEY, '${API_KEY}');
+  assert.equal(artifacts[0].mcpConfig, null);
 });
 
 // ---------- A10 install() is idempotent ----------
@@ -291,6 +290,26 @@ test('A11 injectMcp() merges without clobbering', async () => {
   const after = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf8'));
   assert.ok(after.mcpServers.existing, 'existing server preserved');
   assert.ok(after.mcpServers.connector, 'new server added');
+  // _opsforge_notes: source.md 非可执行 → 注记存在
+  assert.ok(after._opsforge_notes && after._opsforge_notes.connector, 'note for non-executable entrypoint');
+  assert.match(after._opsforge_notes.connector, /示例性 MCP/);
+});
+
+// ---------- A13 injectMcp() executable entrypoint produces no _opsforge_notes ----------
+test('A13 injectMcp() executable entrypoint (server.mjs) → no _opsforge_notes', async () => {
+  const home = mkTmp();
+  setOpsforgeHome(home);
+  const tmp = mkTmp();
+  const capDir = path.join(tmp, 'cap');
+  fs.mkdirSync(capDir, { recursive: true });
+  fs.writeFileSync(path.join(capDir, 'server.mjs'), 'export default {};');
+  const claudeJsonPath = path.join(home, '.claude.json');
+  const a = new ClaudeCodeAdapter();
+  const cap = { yaml: { kind: 'mcp', id: 'foo.connector', entrypoint: 'server.mjs', transport: 'stdio', config_template: { auth_schema: [] } }, dir: capDir };
+  await a.injectMcp(cap);
+  const after = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf8'));
+  assert.ok(after.mcpServers.connector, 'server added');
+  assert.equal(after._opsforge_notes, undefined, 'no note for executable entrypoint');
 });
 
 // ---------- A12 injectMcp() is idempotent ----------

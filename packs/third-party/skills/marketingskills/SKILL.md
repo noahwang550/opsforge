@@ -9,7 +9,7 @@ display_name: Marketing Skills for AI Agents
 display_name_zh: AI 代理营销技能包
 display_name_en: Marketing Skills for AI Agents
 description: 面向技术营销人员与创始人的营销技能合集，让 AI 编码代理在识别到营销任务时自动套用对应框架与最佳实践，覆盖转化优化、文案、SEO、投放、分析、增长工程等场景。
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md

@@ -97,7 +97,7 @@ test('CL6 translate() mcp → mcp-config-merge', () => {
   const a = new ClineAdapter();
   const artifacts = a.translate(parseCapability(capDir));
   assert.equal(artifacts[0].kind, 'mcp-config-merge');
-  assert.ok(artifacts[0].mcpConfig.servers.connector);
+  assert.equal(artifacts[0].mcpConfig, null);
 });
 
 // CL7 install() writes agent artifact idempotently
@@ -130,6 +130,8 @@ test('CL8 injectMcp() merges into cline mcp settings', async () => {
   const after = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   assert.ok(after.mcpServers.existing, 'existing preserved');
   assert.ok(after.mcpServers.connector, 'new added');
+  assert.ok(after._opsforge_notes && after._opsforge_notes.connector, 'note for non-executable entrypoint');
+  assert.match(after._opsforge_notes.connector, /示例性 MCP/);
 });
 
 // CL9 detect() checks .clinerules/ or .cline/ writable

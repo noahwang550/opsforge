@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BaseAdapter } from '../base.mjs';
-import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync } from '../../tools/paths.mjs';
+import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync, isExecutableEntrypoint, EXAMPLE_MCP_NOTE } from '../../tools/paths.mjs';
 
 const SKILLS_DIR = 'skills';
 const MCP_FILE = 'mcp.json';
@@ -141,6 +141,10 @@ export class WorkBuddyAdapter extends BaseAdapter {
     }
     const key = `${SKILL_PREFIX}${name}`;
     config.mcpServers[key] = entry;
+    if (!isExecutableEntrypoint(y.entrypoint)) {
+      config._opsforge_notes = config._opsforge_notes || {};
+      config._opsforge_notes[key] = EXAMPLE_MCP_NOTE;
+    }
     await atomicWrite(cfgPath, JSON.stringify(config, null, 2));
     return { mcp_keys: [key] };
   }
@@ -161,6 +165,7 @@ export class WorkBuddyAdapter extends BaseAdapter {
       if (config.mcpServers) {
         for (const key of opts.mcp_keys) {
           if (config.mcpServers[key]) { delete config.mcpServers[key]; removed.push(`mcp:${key}`); }
+          if (config._opsforge_notes && config._opsforge_notes[key]) { delete config._opsforge_notes[key]; }
         }
         await atomicWrite(cfgPath, JSON.stringify(config, null, 2));
       }

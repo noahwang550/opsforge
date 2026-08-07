@@ -308,7 +308,7 @@ verified_by: steering
 
 **P1**：S6 workflow 覆盖条件化+2 / S8 CI matrix+README+WC3。
 
-**P2**：S9 废弃临时脚本 / MCP entrypoint 横切 / 逐 cap 加 platforms:workbuddy / --profile 批量验证。
+**P2**：~~S9 废弃临时脚本 / MCP entrypoint 横切 / 逐 cap 加 platforms:workbuddy / --profile 批量验证~~。**DONE（P2 收尾已在同分支 `feat/workbuddy-adapter` 叠加 commit，含运行时 `_opsforge_notes` 注记 + 全 14 cap 加 workbuddy + translate mcpConfig 死字段清理 + schema enum 扩展）**：S9 临时脚本删除 + MCP entrypoint 横切（5 adapter `injectMcp` 顶层加 `_opsforge_notes` 注记，`entrypoint` 非 `.mjs/.js` 时标"示例性 MCP，需实现真实 server"，`uninstall` 同步清理注记防泄漏）+ 14 cap（8 yaml + 6 SKILL.md）platforms 加 workbuddy + `capability/workflow/bundle` 三处 schema platforms enum 加 workbuddy + 4 adapter（claude-code/cursor/codex/cline）translate mcp case `mcpConfig` 死字段清 `null`（install.mjs 零消费 translate mcpConfig，全平台共有死字段一次性清理）。`--profile` 批量验证并入 S8 已验证。code-reviewer APPROVE：修 3 缺陷（uninstall `_opsforge_notes` 泄漏清理 + workflow/bundle schema enum 加 workbuddy + workbuddy test fixture 一致性）+ 1 测试加固。bare `node --test` 647→**649**（+2）；6 gates 全绿（14 capabilities）；零新 npm 依赖。
 
 ---
 
@@ -326,8 +326,9 @@ verified_by: steering
 | S7 | +2 | 644 | 全绿 |
 | S8 (P1) | +3 | 647 | 全绿 |
 | S9 (P2) | 0 | 647 | 全绿 |
+| P2 收尾（注记+14cap+死字段+schema） | +2 | 649 | 全绿 |
 
-**终态**：647/0 bare `node --test`，6 gates 全绿，14 capabilities 不变，第 6 个平台适配器 workbuddy（Tier 2）原生落地 + 平台自动探测让 `node install.mjs --install <cap>` 不传 `--platform` 也能自动装对平台。
+**终态**：649/0 bare `node --test`，6 gates 全绿，14 capabilities 不变，第 6 个平台适配器 workbuddy（Tier 2）原生落地 + 平台自动探测让 `node install.mjs --install <cap>` 不传 `--platform` 也能自动装对平台 + P2 收尾（MCP 注记/死字段清理/全 cap 加 workbuddy/schema enum）已落地。
 
 ---
 

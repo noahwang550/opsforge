@@ -8,7 +8,7 @@ display_name: OpsForge Interview
 display_name_zh: OpsForge 访谈
 display_name_en: OpsForge Interview
 description: pure-prompt interview script (no platform agent-file injection) that any LLM can run to produce an interview.md operation record — the Tier 2/3 dual form of capability-interviewer
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md

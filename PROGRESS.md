@@ -629,9 +629,19 @@ Phase 1's `validate.mjs` (now R16–R23 + runSuite), `release.mjs` (3-report gat
 - **w. "translate mcpConfig 死字段"**：`WorkBuddyAdapter.translate` mcp case 原返 `mcpConfig:{servers:{}}`，但 `install.mjs injectMcp` 写入 mcp 配置用的是 `mcpServers` 形状——translate 返回的 `mcpConfig` 从未被任何下游消费。单测绿是因为单测自造了 mock 形状，生产死代码。**教训：adapter translate 返回的 mcpConfig 与 injectMcp 写入的 mcpServers 形状不一致是潜在死字段陷阱；install.mjs 不消费 translate mcpConfig 是全平台共有的。** 与既有记忆 `mock-shape-must-match-schema-validated-shape` 同源变体，已补充该记忆。
 - **x. "workflow 覆盖条件化"**：`install.mjs:376` 无条件用 `workflow-compile.mjs` 覆盖 `adapter.translate` 的 workflow artifacts——而 `workflow-compile` 硬编码 `~/.claude/commands/`，对 WorkBuddy（无 `workflow_orchestration` 能力点）会写到错误路径。S6 加 `supports('workflow_orchestration')` 守卫后才条件化。**教训：install 层"无条件覆盖 adapter.translate"是预存 bug 模式——覆盖前必须先查 `adapter.supports(point)`，能力点不支持就跳过，否则跨平台时写到错误路径。**
 
-### 遗留 P2
+### P2 收尾（同分支叠加 commit，2026-08-07）
 
-- **MCP entrypoint=source.md 横切**：WorkBuddy MCP source.md 是全平台共有问题（照抄同侪），独立 PR 横切处理。
-- **逐 cap 加 `platforms:workbuddy`**：现有 14 个 released capability 的 platform matrix 尚未加 workbuddy，待逐 cap 补。
-- **跨平台同源 translate mcpConfig 死字段清理**：cline 返 `{servers:{}}`、workbuddy 返 null——全平台 translate mcpConfig 都不被 install.mjs 消费，独立 PR 统一清理。
+第七刀 SHIPPED 后在同 `feat/workbuddy-adapter` 分支叠加 P2 三项，code-reviewer APPROVE：
+
+- **(P2 #1) MCP 注记 + uninstall 清理** — `tools/paths.mjs` 加 `isExecutableEntrypoint`（判 `.mjs`/`.js` 后缀）+ `EXAMPLE_MCP_NOTE` 常量；5 adapter（claude-code/cursor/codex/cline/workbuddy）`injectMcp` 写主 key 时同时往顶层 `_opsforge_notes[key]` 注记（`entrypoint` 非 `.mjs/.js` 时标"示例性 MCP，需实现真实 server"），注记放顶层命名空间前缀而非 server entry 内，避免破坏平台 strict-schema 校验；`uninstall` 删主 key 时同步清理 `_opsforge_notes[key]` 防已卸载 cap 注记泄漏。`tools/paths.platform.test.mjs` PD7 + 各 adapter test 加注记断言。
+- **(P2 #2) schema enum + 14 cap 加 workbuddy** — `schema/capability.schema.json` + `schema/workflow.schema.json` + `schema/bundle.schema.json` 三处 platforms enum 同步加 `workbuddy`（第七刀遗漏的 schema 缺口，跨三处一致扩展防契约漂移）；14 cap（8 yaml capability/mcp/workflow + 6 SKILL.md frontmatter）platforms 加 workbuddy。
+- **(P2 #3) translate mcpConfig 死字段清理** — 4 adapter（claude-code/cursor/codex/cline）translate mcp case `mcpConfig` 死字段清 `null`（install.mjs 零消费 translate mcpConfig，全平台共有死字段一次性清理，不再留独立 PR）。
+
+bare `node --test` 647 → **649**（+2）；6 gates 全绿（14 capabilities）；零新 npm 依赖；守住 10 条硬不变量。code-reviewer 修 3 缺陷：uninstall `_opsforge_notes` 泄漏清理 + workflow/bundle schema enum 加 workbuddy 一致性 + workbuddy test fixture 一致性。
+
+### Lessons learned（WorkBuddy P2 收尾会话）
+
+- **y. "_opsforge_notes 注记用顶层命名空间前缀"**：往平台配置文件加自定义元数据注记时，注记必须用命名空间前缀（`_opsforge_notes`）放顶层（非业务 server entry 内）。平台只读已知字段会忽略未知顶层字段，但若放 server entry 内会破坏 strict-schema 校验（如 claude-code `mcpServers.<id>` 只接受已知字段）。**教训：自定义元数据注记用 `_namespace` 前缀放顶层，不要塞进平台 strict-schema 的 entry 内。** 已写记忆 `metadata-annotation-namespace-prefix`。
+- **z. "uninstall 要同步清理元数据注记"**：adapter `uninstall` 删主 key（如 `mcpServers.<id>`）时，必须同步清理同 key 的元数据注记（如 `_opsforge_notes.<id>`），否则已卸载 cap 的注记残留在配置文件里造成泄漏（下次 install 时 `Object.keys` 会读到孤儿注记）。**教训：uninstall 删主 key 的同时必须清理所有同 key 的派生注记，install 写入与 uninstall 清理必须对称。** 已写记忆 `uninstall-must-clean-metadata`。
+- **aa. "schema enum 扩展要跨文件一致"**：扩 platforms enum 加新平台时，不能只改 `capability.schema.json`——`workflow.schema.json` 和 `bundle.schema.json` 各自有一份同名 platforms enum（schema 是 per-kind 的，非 $ref 共享）。只改一处会导致 workflow/bundle 的 platforms 校验漂移（workbuddy 加进 capability schema 但 workflow schema 仍拒，workflow cap 加 platforms:workbuddy 反而被 R-rule 挡）。**教训：加平台时 grep 全 schema 目录的同名 enum，三处（capability/workflow/bundle）必须同步扩展。** 已写记忆 `schema-enum-extension-cross-file`。
 

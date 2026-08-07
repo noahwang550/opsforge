@@ -9,7 +9,7 @@ display_name: Data Quality Profiler
 display_name_zh: 数据库数据质量体检
 display_name_en: Data Quality Profiler
 description: CRM 分析前置的数据库数据质量体检。引导分析师完成环境摸底→全库普查→细看名单确认→数据字典与五维技术体检→表关系推导→CRM 双轴业务统计→四件套产出。全程只读、凭据零接触，支持平台直连、手工接力、凭据文件直连三种执行模式；四件套产物为 Excel/Word（含图表），由确定性生成脚本 `scripts/generate_reports.py` 产出。适用于 MySQL / PostgreSQL 业务库。
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md

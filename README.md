@@ -114,16 +114,16 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 
 | id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
 |---|---|---|---|---|---|---|
-| `opsforge-meta.capability-distiller` | 能力蒸馏器 | agent | claude-code(T1) | 访谈期产出的 interview.md 需要转成能力骨架 + 系统提示词草稿 | 已发布 | 1.0.0 |
-| `opsforge-meta.capability-interviewer` | 能力访谈员 | agent | claude-code(T1) | 业务运营同学要把一件重复工作沉淀成能力，但写不出系统提示词 | 已发布 | 1.0.0 |
-| `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
-| `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
-| `data-team.data-quality-profiler` | 数据库数据质量体检 | skill | claude-code(T1) | CRM 分析项目启动前，对客户业务库做首次数据质量摸底 | 已发布 | 0.2.0 |
-| `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
-| `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
-| `third-party.marketingskills` | AI 代理营销技能包 | skill | claude-code(T1) | 技术营销人员或创始人想让 AI 编码代理代写落地页文案、邮件序列、社媒帖、广告创意 | 已发布 | 0.1.0 |
-| `third-party.member-recall` | 会员召回 | skill | claude-code(T1) | 沉睡会员激活 / 流失会员挽回，需要一套可执行的生产级召回流程 | 已发布 | 0.1.0 |
-| `third-party.sy-automl-mcp` | AutoML 建模连接器 | mcp | claude-code(T1) | 业务运营有一张 CSV 表格，想快速得到一个可用的预测模型（如销量预测、流失预测）。 | 已发布 | 0.1.0 |
+| `opsforge-meta.capability-distiller` | 能力蒸馏器 | agent | claude-code(T1) · workbuddy(T2) | 访谈期产出的 interview.md 需要转成能力骨架 + 系统提示词草稿 | 已发布 | 1.0.0 |
+| `opsforge-meta.capability-interviewer` | 能力访谈员 | agent | claude-code(T1) · workbuddy(T2) | 业务运营同学要把一件重复工作沉淀成能力，但写不出系统提示词 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) · workbuddy(T2) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) · workbuddy(T2) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
+| `data-team.data-quality-profiler` | 数据库数据质量体检 | skill | claude-code(T1) · workbuddy(T2) | CRM 分析项目启动前，对客户业务库做首次数据质量摸底 | 已发布 | 0.2.0 |
+| `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) · workbuddy(T2) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) · workbuddy(T2) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
+| `third-party.marketingskills` | AI 代理营销技能包 | skill | claude-code(T1) · workbuddy(T2) | 技术营销人员或创始人想让 AI 编码代理代写落地页文案、邮件序列、社媒帖、广告创意 | 已发布 | 0.1.0 |
+| `third-party.member-recall` | 会员召回 | skill | claude-code(T1) · workbuddy(T2) | 沉睡会员激活 / 流失会员挽回，需要一套可执行的生产级召回流程 | 已发布 | 0.1.0 |
+| `third-party.sy-automl-mcp` | AutoML 建模连接器 | mcp | claude-code(T1) · workbuddy(T2) | 业务运营有一张 CSV 表格，想快速得到一个可用的预测模型（如销量预测、流失预测）。 | 已发布 | 0.1.0 |
 
 ### 示例能力（dogfood · 非核心交付）
 
@@ -131,10 +131,10 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 
 | id | 中文名 | 类型 | 平台 | 适用场景 | 状态 | 版本 |
 |---|---|---|---|---|---|---|
-| `marketing-team.copywriter` | 营销文案写手 · 示例 | agent | claude-code(T1) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
-| `marketing-team.activity-summary` | 活动总结 · 示例 | skill | claude-code(T1) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
-| `marketing-team.bi-connector` | BI连接器 · 示例 | mcp | claude-code(T1) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
-| `marketing-team.campaign-retrospect` | 活动回顾 · 示例 | workflow | claude-code(T1) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
+| `marketing-team.copywriter` | 营销文案写手 · 示例 | agent | claude-code(T1) · workbuddy(T2) | 双 11 / 618 等大促文案批量生产 | 已发布 | 1.0.0 |
+| `marketing-team.activity-summary` | 活动总结 · 示例 | skill | claude-code(T1) · workbuddy(T2) | 大促后活动复盘与汇报 | 已发布 | 1.0.0 |
+| `marketing-team.bi-connector` | BI连接器 · 示例 | mcp | claude-code(T1) · workbuddy(T2) | 营销活动实时效果查询 | 已发布 | 1.0.0 |
+| `marketing-team.campaign-retrospect` | 活动回顾 · 示例 | workflow | claude-code(T1) · workbuddy(T2) | 大促 / 单品活动结束后自动复盘 | 已发布 | 1.0.0 |
 
 <!-- opsforge:capability-inventory end -->
 

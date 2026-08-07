@@ -26,7 +26,7 @@
     "platforms": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "enum": ["claude-code", "cursor", "codex", "cline", "dify"] }
+      "items": { "type": "string", "enum": ["claude-code", "cursor", "codex", "cline", "dify", "workbuddy"] }
     },
     "params_schema": { "type": "string", "const": "params.schema.json" },
     "steps": {

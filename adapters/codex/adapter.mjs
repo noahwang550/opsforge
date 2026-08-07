@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BaseAdapter } from '../base.mjs';
-import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync } from '../../tools/paths.mjs';
+import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync, isExecutableEntrypoint, EXAMPLE_MCP_NOTE } from '../../tools/paths.mjs';
 
 // Points that degrade to manual-paste on codex (not natively supported).
 const MANUAL_PASTE_POINTS = new Set(['agent_file', 'skill_file', 'slash_command', 'workflow_orchestration', 'kb_mount', 'feedback_hook']);
@@ -42,7 +42,6 @@ export class CodexAdapter extends BaseAdapter {
         return [manualPasteArtifact(y, dir, name)];
       }
       case 'mcp': {
-        const mcpConfig = { servers: {} };
         const entry = {};
         if (y.transport) entry.type = y.transport;
         if (y.transport === 'stdio') { entry.command = 'node'; entry.args = [path.join(dir, y.entrypoint || 'source.md')]; }
@@ -51,8 +50,7 @@ export class CodexAdapter extends BaseAdapter {
           for (const v of y.config_template.auth_schema) env[v] = `\${${v}}`;
           entry.env = env;
         }
-        mcpConfig.servers[name] = entry;
-        return [{ kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig, degradation: null, pasteInstructions: null }];
+        return [{ kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig: null, degradation: null, pasteInstructions: null }];
       }
       case 'workflow':
         // workflow_orchestration unsupported → manual-paste.
@@ -92,6 +90,10 @@ export class CodexAdapter extends BaseAdapter {
       entry.env = env;
     }
     config.mcpServers[name] = entry;
+    if (!isExecutableEntrypoint(y.entrypoint)) {
+      config._opsforge_notes = config._opsforge_notes || {};
+      config._opsforge_notes[name] = EXAMPLE_MCP_NOTE;
+    }
     await atomicWrite(cfgPath, JSON.stringify(config, null, 2));
     return { mcp_keys: [name] };
   }
@@ -111,6 +113,7 @@ export class CodexAdapter extends BaseAdapter {
       if (config.mcpServers) {
         for (const key of opts.mcp_keys) {
           if (config.mcpServers[key]) { delete config.mcpServers[key]; removed.push(`mcp:${key}`); }
+          if (config._opsforge_notes && config._opsforge_notes[key]) { delete config._opsforge_notes[key]; }
         }
         await atomicWrite(cfgPath, JSON.stringify(config, null, 2));
       }

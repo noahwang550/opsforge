@@ -245,3 +245,16 @@ export function detectAllPlatforms(opts = {}) {
   }
   return out;
 }
+
+/**
+ * 判断 MCP entrypoint 是否为可执行脚本（.mjs/.js）。
+ * 示例性 MCP 的 entrypoint 常为 source.md（非可执行），运行时需实现真实 server 后方可运行。
+ * @param {string} ep
+ * @returns {boolean}
+ */
+export function isExecutableEntrypoint(ep) {
+  return typeof ep === 'string' && /\.(mjs|js)$/i.test(ep);
+}
+
+/** 注记文案：示例性 MCP，entrypoint 非可执行，需实现真实 server 后方可运行。 */
+export const EXAMPLE_MCP_NOTE = '示例性 MCP，entrypoint 非可执行，需实现真实 server 后方可运行';

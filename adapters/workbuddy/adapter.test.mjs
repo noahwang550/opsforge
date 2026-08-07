@@ -165,7 +165,7 @@ test('WB9 install() writes skill artifact idempotently', async () => {
   const c2 = fs.readFileSync(artifacts[0].targetPath, 'utf8');
   assert.equal(c1, c2);
   // mcp-config-merge artifact produces no written file
-  const mcpArt = { kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig: { servers: {} }, degradation: null, pasteInstructions: null };
+  const mcpArt = { kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig: null, degradation: null, pasteInstructions: null };
   const r = await a.install([mcpArt]);
   assert.equal(r.artifacts.length, 0);
 });
@@ -188,6 +188,8 @@ test('WB10 injectMcp() merges into workbuddy mcp.json', async () => {
   assert.ok(after.mcpServers['opsforge-connector'], 'new added with opsforge- prefix');
   assert.equal(after.mcpServers['opsforge-connector'].env.API_KEY, '${API_KEY}');
   assert.ok(r.mcp_keys.includes('opsforge-connector'));
+  assert.ok(after._opsforge_notes && after._opsforge_notes['opsforge-connector'], 'note for non-executable entrypoint');
+  assert.match(after._opsforge_notes['opsforge-connector'], /示例性 MCP/);
 });
 
 // WB11 uninstall() removes artifact + mcp keys
@@ -202,12 +204,13 @@ test('WB11 uninstall() removes artifact and mcp keys', async () => {
   // seed mcp config
   const cfgPath = path.join(home, '.workbuddy', 'mcp.json');
   fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
-  fs.writeFileSync(cfgPath, JSON.stringify({ mcpServers: { 'opsforge-bar': { command: 'node' } } }));
+  fs.writeFileSync(cfgPath, JSON.stringify({ mcpServers: { 'opsforge-bar': { command: 'node' } }, _opsforge_notes: { 'opsforge-bar': '示例性 MCP' } }));
   const r = await a.uninstall('foo.bar', { artifacts: [tp], mcp_keys: ['opsforge-bar'] });
   assert.ok(!fs.existsSync(tp));
   assert.ok(r.uninstalled.includes(`mcp:opsforge-bar`));
   const after = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   assert.ok(!after.mcpServers['opsforge-bar'], 'mcp key removed');
+  assert.ok(!after._opsforge_notes || !after._opsforge_notes['opsforge-bar'], 'note for removed mcp key cleaned up');
 });
 
 // WB12 detect() returns true when ~/.workbuddy writable, false when missing

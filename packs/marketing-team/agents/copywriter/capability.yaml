@@ -9,6 +9,7 @@ display_name_en: Marketing Copywriter
 description: copywriter agent that creates marketing copy content
 platforms:
   - claude-code
+  - workbuddy
 entrypoint: source.md
 tests: tests/
 changelog: CHANGELOG.md

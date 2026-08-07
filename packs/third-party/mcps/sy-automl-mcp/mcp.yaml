@@ -8,7 +8,7 @@ display_name: AutoML 建模连接器
 display_name_zh: AutoML 建模连接器
 display_name_en: AutoML MCP Connector
 description: AutoGluon 自动建模 MCP 服务 — 数据加载、训练、预测、评估、模型管理全流程
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: source.md
 tests: tests/
 changelog: CHANGELOG.md

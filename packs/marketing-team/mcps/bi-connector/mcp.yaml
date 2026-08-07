@@ -9,6 +9,7 @@ display_name_en: BI Connector
 description: connector mcp that interfaces with business intelligence systems
 platforms:
   - claude-code
+  - workbuddy
 entrypoint: source.md
 tests: tests/
 changelog: CHANGELOG.md

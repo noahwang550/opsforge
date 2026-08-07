@@ -12,6 +12,7 @@ import {
   mcpConfigPathFor,
   detectPlatform,
   detectAllPlatforms,
+  isExecutableEntrypoint,
 } from './paths.mjs';
 
 function mkTmp() {
@@ -85,4 +86,16 @@ test('PD6 platformInstallDir + mcpConfigPathFor return correct paths', () => {
   assert.equal(mcpConfigPathFor('dify'), null);
   // 未知平台 → null
   assert.equal(platformInstallDir('nonexistent'), null);
+});
+
+// PD7 isExecutableEntrypoint 判断 MCP entrypoint 是否为可执行脚本
+test('PD7 isExecutableEntrypoint distinguishes executable vs non-executable entrypoints', () => {
+  assert.equal(isExecutableEntrypoint('source.md'), false);
+  assert.equal(isExecutableEntrypoint('server.mjs'), true);
+  assert.equal(isExecutableEntrypoint('server.js'), true);
+  assert.equal(isExecutableEntrypoint('SERVER.MJS'), true); // case-insensitive
+  assert.equal(isExecutableEntrypoint(undefined), false);
+  assert.equal(isExecutableEntrypoint(null), false);
+  assert.equal(isExecutableEntrypoint(''), false);
+  assert.equal(isExecutableEntrypoint('readme.txt'), false);
 });

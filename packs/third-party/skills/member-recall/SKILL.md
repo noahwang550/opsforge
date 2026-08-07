@@ -9,7 +9,7 @@ display_name: Member Recall
 display_name_zh: 会员召回
 display_name_en: Member Recall
 description: 生产级交互式 CRM 会员召回能力，引导运营团队完成严谨的分阶段召回生产任务（初始化→动机洞察→品牌调性确认→联网调研→文案创生→策略匹配→产出交付）。LLM 直接承担动机洞察与文案创生（无需外部 API Key），确定性处理（CSV 读写、数据画像、敏感词检测、启发式匹配、A/B 拆分）由上游 scripts/data_utils.py 承担，全程用户审核确认，无模拟无假设。
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md
