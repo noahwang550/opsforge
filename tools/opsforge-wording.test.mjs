@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { promptInstallFlow } from './opsforge.mjs';
 
@@ -116,4 +117,50 @@ test('WC7 install boundary hints use business wording', async () => {
     assert.doesNotMatch(text, /clone|仓库|下到本地/i, 'official boundary must not give impossible instructions');
     assert.doesNotMatch(text, FORBIDDEN_RE);
   }
+});
+
+// WC8/WC9/WC10: 平台自动探测提示文案守则（S3 install.mjs resolvePlatform/printPlatformHint）.
+// 守 wording-rules-need-executable-assertions：自动探测/多平台/零平台提示必须落可执行断言.
+const TECHNICAL_RE = /detectPlatform|PLATFORM_DIRS|fs\.existsSync|resolveHome|platformInstallDir/;
+function mkPlatHome() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'opsforge-wc-'));
+}
+function runInstallCli(home) {
+  return spawnSync(process.execPath, [path.join(REPO_ROOT, 'install.mjs'), '--install', 'marketing-team.copywriter', '--dry-run'], {
+    cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000,
+    env: { ...process.env, OPSFORGE_HOME: home, OPSFORGE_RUNNER: 'static-only' },
+  });
+}
+
+// WC8: 自动探测提示文案无技术词（不出现 detectPlatform/PLATFORM_DIRS/fs.existsSync 等）.
+test('WC8 auto-detect hint contains no technical terms', () => {
+  const home = mkPlatHome();
+  fs.mkdirSync(path.join(home, '.workbuddy'), { recursive: true });
+  const r = runInstallCli(home);
+  assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+  assert.doesNotMatch(r.stdout, TECHNICAL_RE, 'auto-detect hint must not leak technical terms');
+});
+
+// WC9: 多平台提示用业务话（"检测到多个 AI 助手平台已安装"而非技术词）.
+test('WC9 multi-platform hint uses business wording', () => {
+  const home = mkPlatHome();
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  fs.mkdirSync(path.join(home, '.workbuddy'), { recursive: true });
+  const r = runInstallCli(home);
+  assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+  assert.match(r.stdout, /检测到多个 AI 助手平台已安装/);
+  assert.match(r.stdout, /默认安装到 claude-code/);
+  assert.doesNotMatch(r.stdout, TECHNICAL_RE);
+});
+
+// WC10: 零平台提示引导用户（列出可选平台，不报 stack trace）.
+test('WC10 zero-platform hint guides user with available platforms', () => {
+  const home = mkPlatHome();
+  const r = runInstallCli(home);
+  assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+  assert.match(r.stdout, /未检测到已安装的 AI 助手平台/);
+  assert.match(r.stdout, /可选平台：claude-code \/ cursor \/ codex \/ cline \/ dify \/ workbuddy/);
+  // 不报 stack trace
+  assert.doesNotMatch(r.stdout, /at .*\.mjs:\d+/);
+  assert.doesNotMatch(r.stdout, /Error|TypeError|ReferenceError/);
 });

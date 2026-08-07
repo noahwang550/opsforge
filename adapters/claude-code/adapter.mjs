@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BaseAdapter } from '../base.mjs';
-import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync } from '../../tools/paths.mjs';
+import { resolveHome, assertSlugSegment, atomicWrite, readJsonOrNullSync, isExecutableEntrypoint, EXAMPLE_MCP_NOTE } from '../../tools/paths.mjs';
 
 export class ClaudeCodeAdapter extends BaseAdapter {
   platform = 'claude-code';
@@ -55,7 +55,6 @@ export class ClaudeCodeAdapter extends BaseAdapter {
         return [{ kind: 'skill-file', targetPath, content, mcpConfig: null, degradation: null, pasteInstructions: null }];
       }
       case 'mcp': {
-        const mcpConfig = { servers: {} };
         const serverName = name;
         const serverEntry = {};
         if (y.transport) serverEntry.type = y.transport;
@@ -71,8 +70,7 @@ export class ClaudeCodeAdapter extends BaseAdapter {
           }
           serverEntry.env = env;
         }
-        mcpConfig.servers[serverName] = serverEntry;
-        return [{ kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig, degradation: null, pasteInstructions: null }];
+        return [{ kind: 'mcp-config-merge', targetPath: null, content: null, mcpConfig: null, degradation: null, pasteInstructions: null }];
       }
       case 'workflow': {
         // P1-4: workflow translate is handled by install.mjs calling
@@ -130,6 +128,10 @@ export class ClaudeCodeAdapter extends BaseAdapter {
     }
 
     config.mcpServers[name] = serverEntry;
+    if (!isExecutableEntrypoint(y.entrypoint)) {
+      config._opsforge_notes = config._opsforge_notes || {};
+      config._opsforge_notes[name] = EXAMPLE_MCP_NOTE;
+    }
     await atomicWrite(claudeJsonPath, JSON.stringify(config, null, 2));
     return { mcp_keys: [name] };
   }
@@ -164,6 +166,7 @@ export class ClaudeCodeAdapter extends BaseAdapter {
             delete config.mcpServers[key];
             removed.push(`mcp:${key}`);
           }
+          if (config._opsforge_notes && config._opsforge_notes[key]) { delete config._opsforge_notes[key]; }
         }
         await atomicWrite(claudeJsonPath, JSON.stringify(config, null, 2));
       }

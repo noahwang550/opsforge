@@ -9,6 +9,7 @@ display_name_en: Campaign Retrospect
 description: '【示例能力】retrospect workflow that reviews campaign performance'
 platforms:
   - claude-code
+  - workbuddy
 params_schema: params.schema.json
 steps:
   - id: collect-metrics

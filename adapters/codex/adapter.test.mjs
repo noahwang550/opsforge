@@ -97,7 +97,7 @@ test('CX6 translate() mcp → mcp-config-merge', () => {
   const a = new CodexAdapter();
   const artifacts = a.translate(parseCapability(capDir));
   assert.equal(artifacts[0].kind, 'mcp-config-merge');
-  assert.ok(artifacts[0].mcpConfig.servers.connector);
+  assert.equal(artifacts[0].mcpConfig, null);
 });
 
 // CX7 install() writes manual-paste artifact (no targetPath → instructions only, nothing written)
@@ -128,6 +128,8 @@ test('CX8 injectMcp() merges into codex mcp config', async () => {
   const after = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   assert.ok(after.mcpServers.existing, 'existing preserved');
   assert.ok(after.mcpServers.connector, 'new added');
+  assert.ok(after._opsforge_notes && after._opsforge_notes.connector, 'note for non-executable entrypoint');
+  assert.match(after._opsforge_notes.connector, /示例性 MCP/);
 });
 
 // CX9 detect() checks ~/.codex/ writable
@@ -147,12 +149,14 @@ test('CX10 uninstall() removes mcp keys', async () => {
   const home = mkTmp(); setHome(home);
   const cfgPath = path.join(home, '.codex', 'config.json');
   fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
-  fs.writeFileSync(cfgPath, JSON.stringify({ mcpServers: { connector: { command: 'node' }, keep: { command: 'y' } } }));
+  fs.writeFileSync(cfgPath, JSON.stringify({ mcpServers: { connector: { command: 'node' }, keep: { command: 'y' } }, _opsforge_notes: { connector: '示例性 MCP', keep: 'keep-me' } }));
   const a = new CodexAdapter();
   await a.uninstall('foo.connector', { mcp_keys: ['connector'] });
   const after = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   assert.ok(!after.mcpServers.connector, 'connector removed');
   assert.ok(after.mcpServers.keep, 'keep preserved');
+  assert.ok(!after._opsforge_notes || !after._opsforge_notes.connector, 'note for removed mcp key cleaned up');
+  assert.ok(after._opsforge_notes && after._opsforge_notes.keep === 'keep-me', 'note for preserved mcp key retained');
 });
 
 // CX11 default adapter instance exported

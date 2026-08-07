@@ -1,0 +1,30 @@
+platform: workbuddy
+display_name: WorkBuddy
+display_name_zh: WorkBuddy
+capability_points:
+  prompt_exec:
+    supported: true
+    mode: cli
+  agent_file:
+    supported: false
+    fallback: cli-engine
+  skill_file:
+    supported: true
+  slash_command:
+    supported: true
+  mcp_config:
+    supported: true
+  workflow_orchestration:
+    supported: false
+    fallback: cli-engine
+  config_dir_writable:
+    supported: true
+  kb_mount:
+    supported: false
+    fallback: manual-paste
+  feedback_hook:
+    supported: false
+    fallback: manual-paste
+locale: zh-CN
+compliance_tags: [data-residency-cn]
+verified_by: steering

@@ -10,6 +10,7 @@ display_name_en: Activity Summary
 description: '【示例能力】summary skill that generates activity reports'
 platforms:
   - claude-code
+  - workbuddy
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md

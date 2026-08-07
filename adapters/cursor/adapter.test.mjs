@@ -93,8 +93,7 @@ test('CU6 translate() mcp → mcp-config-merge', () => {
   const a = new CursorAdapter();
   const artifacts = a.translate(parseCapability(capDir));
   assert.equal(artifacts[0].kind, 'mcp-config-merge');
-  assert.ok(artifacts[0].mcpConfig.servers.connector);
-  assert.equal(artifacts[0].mcpConfig.servers.connector.env.API_KEY, '${API_KEY}');
+  assert.equal(artifacts[0].mcpConfig, null);
 });
 
 // CU7 install() writes agent artifact idempotently
@@ -128,6 +127,8 @@ test('CU8 injectMcp() merges into .cursor/mcp.json', async () => {
   const after = JSON.parse(fs.readFileSync(mcpJson, 'utf8'));
   assert.ok(after.mcpServers.existing, 'existing preserved');
   assert.ok(after.mcpServers.connector, 'new added');
+  assert.ok(after._opsforge_notes && after._opsforge_notes.connector, 'note for non-executable entrypoint');
+  assert.match(after._opsforge_notes.connector, /示例性 MCP/);
 });
 
 // CU9 detect() checks .cursor/ writable

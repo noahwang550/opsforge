@@ -8,7 +8,7 @@ display_name: OpsForge Wizard
 display_name_zh: OpsForge 向导
 display_name_en: OpsForge Wizard
 description: interactive wizard skill that guides business authors through the 5-step capability creation and install flows with Chinese prompts and real-time quality feedback
-platforms: [claude-code]
+platforms: [claude-code, workbuddy]
 entrypoint: SKILL.md
 tests: tests/
 changelog: CHANGELOG.md
