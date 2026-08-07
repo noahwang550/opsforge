@@ -20,6 +20,10 @@ jobs:
       - name: Run security-scan --all (§B non-exceptionable families)
         run: node tools/security-scan.mjs --all
       - name: Run eval --all (§21.4 5-axis, 3rd CI artifact; verdict pending in static-only)
+        # MEMORY: 必须 OPSFORGE_RUNNER=static-only，否则 resolveClaudeBin 找到 claude
+        # → live spawn → nested-session failure → verdict=fail（CI 红而本地静态绿）。
+        env:
+          OPSFORGE_RUNNER: static-only
         run: node tools/eval.mjs --all
       - name: Run release --all (§B.4 3-report gate)
         run: node tools/release.mjs --all

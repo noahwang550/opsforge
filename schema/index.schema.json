@@ -1,0 +1,470 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpsForge remote index.json",
+  "description": "Derived (non-SSOT) remote capability index. Top-level shape mirrors catalogSummary() (catalog-model.mjs). Treated as untrusted data: must be ajv-validated before consumption. capabilities/<id>.json validated via definitions.fullEntry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "generatedAt",
+    "count",
+    "platforms",
+    "filters",
+    "capabilities"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "platforms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/platform"
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kinds",
+        "sources",
+        "scopes",
+        "projects",
+        "availability",
+        "qualities"
+      ],
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        },
+        "qualities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filterOption"
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/summaryItem"
+      }
+    }
+  },
+  "definitions": {
+    "filterOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "platformSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "name",
+        "tier",
+        "status",
+        "label"
+      ],
+      "properties": {
+        "platform": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tier": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "qualityChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validation",
+        "security",
+        "eval"
+      ],
+      "properties": {
+        "validation": {
+          "type": "string"
+        },
+        "security": {
+          "type": "string"
+        },
+        "eval": {
+          "type": "string"
+        }
+      }
+    },
+    "summaryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "name",
+        "nameEn",
+        "description",
+        "scenarioTag",
+        "scenarios",
+        "kind",
+        "kindLabel",
+        "pack",
+        "scope",
+        "scopeLabel",
+        "project",
+        "projectLabel",
+        "source",
+        "quality",
+        "releasedAt",
+        "platformSupport",
+        "availability"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nameEn": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "scenarioTag": {
+          "type": "string"
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "kindLabel": {
+          "type": "string"
+        },
+        "pack": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "scopeLabel": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectLabel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "$ref": "#/definitions/source"
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "green",
+            "yellow",
+            "red"
+          ]
+        },
+        "releasedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platformSupport": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/platformSupport"
+          }
+        },
+        "availability": {
+          "type": "string",
+          "enum": [
+            "usable",
+            "reference-only"
+          ]
+        }
+      }
+    },
+    "fullEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "name",
+        "nameEn",
+        "description",
+        "scenarioTag",
+        "scenarios",
+        "kind",
+        "kindLabel",
+        "pack",
+        "scope",
+        "scopeLabel",
+        "project",
+        "projectLabel",
+        "source",
+        "quality",
+        "releasedAt",
+        "platformSupport",
+        "availability",
+        "detail",
+        "qualityChecks",
+        "dependencies",
+        "usage"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nameEn": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "scenarioTag": {
+          "type": "string"
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "kindLabel": {
+          "type": "string"
+        },
+        "pack": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "scopeLabel": {
+          "type": "string"
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectLabel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "$ref": "#/definitions/source"
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "green",
+            "yellow",
+            "red"
+          ]
+        },
+        "releasedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "platformSupport": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/platformSupport"
+          }
+        },
+        "availability": {
+          "type": "string",
+          "enum": [
+            "usable",
+            "reference-only"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        },
+        "qualityChecks": {
+          "$ref": "#/definitions/qualityChecks"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/usageValue"
+          }
+        },
+        "installHint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "usageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "label",
+        "title",
+        "steps",
+        "requirements"
+      ],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

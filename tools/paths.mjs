@@ -115,3 +115,71 @@ export function assertCapId(capId) {
   if (!CAP_ID_RE.test(capId)) throw new Error(`path-guard: capId "${capId}" invalid`);
   return capId;
 }
+
+/**
+ * draftsRoots(repoRoot) — B1: 枚举所有 _drafts 根（通用 + 品牌）。
+ * 复用 validate.mjs scanCapabilities 同款枚举逻辑，只取 _drafts/。
+ * @param {string} repoRoot
+ * @returns {string[]} absolute draft root dirs that exist
+ */
+export function draftsRoots(repoRoot) {
+  const out = [];
+  const general = path.join(repoRoot, 'packs', '_drafts');
+  if (fs.existsSync(general)) out.push(general);
+  const customersDir = path.join(repoRoot, 'customers');
+  if (fs.existsSync(customersDir)) {
+    for (const brand of fs.readdirSync(customersDir, { withFileTypes: true })) {
+      if (!brand.isDirectory()) continue;
+      const bp = path.join(customersDir, brand.name, 'packs', '_drafts');
+      if (fs.existsSync(bp)) out.push(bp);
+    }
+  }
+  return out;
+}
+
+/**
+ * listDrafts(repoRoot) — B1: 列所有 _drafts 下的草稿能力目录。
+ * @param {string} repoRoot
+ * @returns {{slug: string, name: string, kind: string, path: string, mtime: number, hasFillMe: boolean}[]}
+ *  mtime 倒序（最近改的在前）；kind 从 capability/mcp/workflow/bundle.yaml 解析默认 agent；
+ *  hasFillMe 扫所有文本文件含 __FILL_ME__。
+ */
+export function listDrafts(repoRoot) {
+  const out = [];
+  for (const draftsDir of draftsRoots(repoRoot)) {
+    if (!fs.existsSync(draftsDir)) continue;
+    for (const slug of fs.readdirSync(draftsDir, { withFileTypes: true })) {
+      if (!slug.isDirectory()) continue;
+      assertSlugSegment(slug.name, 'draft slug');
+      const slugDir = path.join(draftsDir, slug.name);
+      for (const name of fs.readdirSync(slugDir, { withFileTypes: true })) {
+        if (!name.isDirectory()) continue;
+        assertSlugSegment(name.name, 'draft name');
+        const capDir = path.join(slugDir, name.name);
+        let kind = 'agent', hasFillMe = false;
+        for (const f of fs.readdirSync(capDir, { withFileTypes: true })) {
+          const fp = path.join(capDir, f.name);
+          if (['capability.yaml', 'mcp.yaml', 'workflow.yaml', 'bundle.yaml'].includes(f.name)) {
+            try {
+              const raw = fs.readFileSync(fp, 'utf8');
+              const km = raw.match(/^kind:\s*(\S+)/m);
+              if (km) kind = km[1].replace(/['"]/g, '');
+            } catch { /* skip */ }
+          }
+          if (f.isFile()) {
+            try { if (fs.readFileSync(fp, 'utf8').includes('__FILL_ME__')) hasFillMe = true; } catch { /* skip */ }
+          }
+        }
+        const st = fs.statSync(capDir);
+        out.push({ slug: slug.name, name: name.name, kind, path: capDir, mtime: st.mtimeMs, hasFillMe });
+      }
+    }
+  }
+  out.sort((a, b) => b.mtime - a.mtime);
+  return out;
+}
+
+/** submitTokenPath() — B1: 贡献码存盘路径 ~/.opsforge/submit-token.json。 */
+export function submitTokenPath() {
+  return path.join(resolveOpsforgeHome(), 'submit-token.json');
+}

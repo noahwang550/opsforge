@@ -79,6 +79,11 @@ function writeState(opsforgeHome, workflowId, runId, state) {
   atomicWriteSync(path.join(runDir(opsforgeHome, workflowId, runId), 'state.json'), JSON.stringify(state, null, 2));
 }
 
+// Monotonic counter disambiguates runs that start in the same millisecond
+// (Date.now() is ms-resolution; two rapid startWorkflow calls would otherwise
+// collide on runId → second overwrites first → listRuns undercounts). See WF2.
+let _runSeq = 0;
+
 /**
  * Start a workflow run: create the run dir + initial state.json.
  * @param {{workflow: Object, opsforgeHome?: string, runId?: string}} args
@@ -86,7 +91,7 @@ function writeState(opsforgeHome, workflowId, runId, state) {
  */
 export function startWorkflow({ workflow, opsforgeHome, runId }) {
   const wfId = workflow.id || 'unknown.workflow';
-  runId = runId || `run-${Date.now()}-${process.pid}`;
+  runId = runId || `run-${Date.now()}-${process.pid}-${++_runSeq}`;
   const nodes = orderedNodes(workflow);
   const boundary = buildBoundaryMap(workflow);
   const state = {

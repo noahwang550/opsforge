@@ -35,6 +35,8 @@ const PRINT_TOPICS = {
     '  5) 查看能力报告（流转进度 / 体检）',
     '  6) 反馈（给能力打分）',
     '  7) 浏览仓库全部能力（清单 + 适用场景）',
+    '  8) 打开能力目录（浏览器，搜索/筛选全部能力）',
+    '  9) 提交我的能力到能力仓（让其他人能下载）',
     '  0) 退出',
     '----------------------------------------',
   ].join('\n'),
@@ -43,7 +45,7 @@ const PRINT_TOPICS = {
     '推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。',
     '  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）',
     '  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）',
-    '  ③ 收录第三方能力（git 地址 → intake，落到 _drafts/third-party/）',
+    '  ③ 收录第三方能力（粘贴来源网址，自动收录）',
   ].join('\n'),
   'wizard-routing': [
     'OpsForge 向导 — 引导式创建能力',
@@ -51,6 +53,13 @@ const PRINT_TOPICS = {
     '  ① 调出 @capability-interviewer  ② 直接脚手架（逃生路径）',
   ].join('\n'),
   'push-reminder': '📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。',
+  'catalog-hint': '想看这能力的详情？主菜单选 8 打开能力目录。',
+  'discover-remote-hint': '想看全部能力？主菜单选 8 打开能力目录，或直接跑 opsforge discover。',
+  'submit-hint': '建好了？回主菜单选 9 一键提交到能力仓（让其他人能下载）。',
+  'submit-flow': [
+    '--- 提交我的能力到能力仓 ---',
+    '把本地草稿提交成中心仓库的提交，运营团队审核通过后其他人就能装。',
+  ].join('\n'),
   'error-recovery': '[黄] <msg>\n可能原因：<reason>\n下一步：<next-step>\n已返回主菜单。',
   'distiller-steps': 'Step ① · Shape inference + C12 mapping: read `_drafts/<slug>/interview.md` `## 流程实录`. Infer the kind with rationale.\nStep ② · Scaffold: `Bash: node tools/new-capability.mjs --kind <推断kind> --slug <slug> --name <name>`.\nStep ③ · Overwrite business fields + dual artifacts: Write the full body in **one** call (all H2 sections + dual artifacts).\nStep ④ · Field defaults author-confirm: give quadrant/source/confidence/allow_exact_reason defaults per case.\nStep ⑤ · `Bash: opsforge set-phase <capDir> distill_done`.',
   'wizard-phases': 'Phase 1 · 访谈期: invoke @capability-interviewer (claude-code) or paste opsforge-interview pure-prompt skill (Tier 2/3). Produces _drafts/<slug>/interview.md.\nPhase 2 · 蒸馏期: invoke @capability-distiller. Reads interview.md, infers kind, scaffolds, overwrites body + dual artifacts, calls set-phase distill_done.\nPhase 3 · 跑通期: run structure gate + run-light gate (test-runner.mjs dry-run ≥2 cases). Render two-tier light via report-renderer.mjs.\nPhase 4 · 迭代期: passive evolve trigger (feedback≤2 or 3rd discover/doctor call → suggest opsforge evolve).',
@@ -196,7 +205,7 @@ export async function cmdMenu(rl, opts = {}) {
   const menu = () => console.log(PRINT_TOPICS['menu']);
   while (true) {
     menu();
-    const choice = (await ask('请选择 [0-7]: ')).trim();
+    const choice = (await ask('请选择 [0-9]: ')).trim();
     if (choice === '0' || choice === '' || choice === 'quit' || choice === 'exit') return 0;
     if (choice === 'menu' || choice === 'back') continue;
     try {
@@ -208,8 +217,10 @@ export async function cmdMenu(rl, opts = {}) {
         case '5': await cmdStatusFlow(rl, opts); break;
         case '6': await cmdFeedback(rl, opts); break;
         case '7': await cmdDiscover({ ...opts, all: true }); break;
+        case '8': await cmdCatalogFlow(rl, opts); break;
+        case '9': await cmdSubmitFlow(rl, opts); break;
         default:
-          console.log('没看懂这个选项，请输入 0 到 7 之间的数字。');
+          console.log('没看懂这个选项，请输入 0 到 9 之间的数字。');
       }
     } catch (e) {
       console.log(`[黄] ${e.message}`);
@@ -245,12 +256,154 @@ async function cmdNewFlow(rl, opts = {}) {
   });
   console.log(`绿 已创建: ${result.destPath}`);
   console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
-  printPushReminder();
+  printSubmitHint();
+  printCatalogHint();
 }
 
 /** 能力创建/收录收尾统一提醒：别忘了推送云端仓库（B2 会话级提醒）。 */
 export function printPushReminder() {
   console.log(PRINT_TOPICS['push-reminder']);
+}
+
+/** A2: 业务指引——指向能力目录（主菜单选 8）。 */
+export function printCatalogHint() {
+  console.log(PRINT_TOPICS['catalog-hint']);
+}
+
+/** A2: 业务指引——指向一键提交（主菜单选 9）。保留向后兼容。 */
+export function printSubmitHint() {
+  console.log(PRINT_TOPICS['submit-hint']);
+}
+
+/**
+ * cmdCatalogFlow(rl, opts) — A1: 菜单分支 8。
+ * 启动 catalog server（port:0 OS 分配）→ 读 server.address().port → 开浏览器 →
+ * 按回车关闭 server 回主菜单（不让用户 Ctrl+C，避免 Windows 杀整个进程）。
+ * 文案不含 127.0.0.1/port/http:// 字眼（URL 只传给 openInBrowser 不打印）。
+ * @param {readline.Interface} rl
+ * @param {{opsforgeHome?: string, workDir?: string, startServer?: Function, openBrowser?: Function}} opts
+ * @returns {Promise<number>}
+ */
+export async function cmdCatalogFlow(rl, opts = {}) {
+  const ask = (q) => new Promise((r) => rl.question(q, r));
+  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+  const { openInBrowser } = await import('./opsforge-catalog-launcher.mjs');
+  const open = opts.openBrowser || openInBrowser;
+  // C2: 仓库在→本地 server；仓库不在→远程探测.
+  const repoPresent = ['templates', 'schema', 'tools'].every((d) => fs.existsSync(path.join(workDir, d)));
+  if (!repoPresent) {
+    // repo-less：探测远程可达.
+    const fetchFn = opts.fetchRemoteIndex || (await import('./index-fetch.mjs')).fetchRemoteIndex;
+    const officialUrl = opts.officialIndexUrl || (await import('./index-fetch.mjs')).officialIndexUrl;
+    try {
+      const url = process.env.OPSFORGE_INDEX_URL || officialUrl({ repoRoot: workDir });
+      await fetchFn({ url, refresh: false });
+      // 远程可达 → 打开远程站点（URL 去掉 /index.json 换 /）.
+      const catalogUrl = url.replace(/\/index\.json$/, '/');
+      open(catalogUrl);
+      console.log('已打开能力广场（在线版），看完关掉浏览器回这里按回车。');
+      await ask('按回车回到主菜单…');
+    } catch {
+      // 远程不可达 → 不起浏览器，业务话兜底，不提示选 8（避免死循环）.
+      console.log('能力广场暂时打不开，可能还没准备好。稍后再试，或联系团队管理员。');
+    }
+    return 0;
+  }
+  // 仓库在→照旧起本地 server.
+  const { startCatalogServer } = await import('./catalog-server.mjs');
+  const start = opts.startServer || startCatalogServer;
+  let server;
+  try {
+    const { server: srv } = await start({ port: 0, host: '127.0.0.1', repoRoot: workDir });
+    server = srv;
+    const port = server.address().port;   // 第六部分技术修正：不改 startCatalogServer 返回结构
+    open(`http://127.0.0.1:${port}/`);     // openInBrowser 内部校验 host，失败只打印业务话
+    if (opts.onServerStart) opts.onServerStart(port);
+    console.log('已打开能力目录，浏览器应该已经弹出来了。看完按回车回到主菜单。');
+    await ask('按回车回到主菜单…');
+  } catch (e) {
+    console.log(`[黄] 能力目录暂时打不开：${e.message}`);
+    console.log('你可以在主菜单选 7 浏览全部能力清单。');
+  } finally {
+    if (server) await new Promise((r) => server.close(r));
+    if (opts.onServerStop) opts.onServerStop();
+  }
+  return 0;
+}
+
+/**
+ * cmdSubmitFlow(rl, opts) — 菜单分支 9：一键提交本地草稿到中心仓库。
+ * listDrafts → 选 → 预检（§A+§B+static-only tests）→ 贡献码（首次引导）→
+ * submit() → 业务话结果。文案全守则化（提交进度页/运营团队审核/主菜单选 2 装到他们电脑）。
+ * @param {readline.Interface} rl
+ * @param {{opsforgeHome?: string, workDir?: string, listDrafts?: Function, submit?: Function}} opts
+ * @returns {Promise<number>}
+ */
+export async function cmdSubmitFlow(rl, opts = {}) {
+  const ask = (q) => new Promise((r) => rl.question(q, r));
+  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
+  console.log(PRINT_TOPICS['submit-flow']);
+  const { listDrafts } = await import('./paths.mjs');
+  const listFn = opts.listDrafts || listDrafts;
+  const drafts = listFn(workDir);
+  if (drafts.length === 0) {
+    console.log('○ 没有本地草稿。请先在主菜单选 1 新建能力。');
+    return 0;
+  }
+  console.log('本地草稿：');
+  drafts.forEach((d, i) => {
+    const mtime = new Date(d.mtime).toLocaleString('zh-CN');
+    const fill = d.hasFillMe ? ' [黄 还有未填项]' : '';
+    console.log(`  ${i + 1}) ${d.slug}.${d.name}  (${d.kind})  ${mtime}${fill}`);
+  });
+  const sel = (await ask('选择要提交的序号（回车取消）: ')).trim();
+  if (!sel) { console.log('已取消。'); return 0; }
+  const idx = Number(sel) - 1;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= drafts.length) {
+    console.log('序号不对，已取消。');
+    return 1;
+  }
+  const draft = drafts[idx];
+  if (draft.hasFillMe) {
+    console.log('黄 这个草稿还有未填项（标记 __FILL_ME__）。建议先填完再提交。');
+    if ((await ask('仍要提交？[y/N]: ')).trim().toLowerCase() !== 'y') {
+      console.log('已取消。');
+      return 0;
+    }
+  }
+  const { readSubmitToken, writeSubmitToken, PreflightError } = await import('./submit.mjs');
+  let token = readSubmitToken()?.token;
+  if (!token) {
+    console.log('首次使用：请联系团队管理员领取『贡献码』，粘贴在下面（只需一次）：');
+    token = (await ask('贡献码: ')).trim();
+    if (!token) { console.log('未输入贡献码，已取消。'); return 1; }
+    writeSubmitToken(token);
+  }
+  const submitFn = opts.submit || (await import('./submit.mjs')).submit;
+  try {
+    console.log('正在提交…');
+    const r = await submitFn({ draftDir: draft.path, repoRoot: workDir, token });
+    const verb = r.updated ? '已更新原提交' : '已提交';
+    console.log(`绿 ${verb}！提交进度页：${r.prUrl}`);
+    console.log('运营团队会审核，通过后其他人就能在主菜单选 2 装到他们电脑。');
+    printCatalogHint();
+  } catch (e) {
+    if (e instanceof PreflightError) {
+      if (e.kind === 'tests') {
+        // M3：test-runner 报告结构与 eval-report 不同，不走 render()，直接业务话。
+        const fail = e.report && typeof e.report.fail === 'number' ? e.report.fail : '?';
+        console.log(`[红] 预检没过：测试有 ${fail} 项没通过，请改完再回主菜单选 9 重新提交。`);
+      } else {
+        const typeMap = { validation: 'validation-report', security: 'security-report' };
+        const r = render(e.report, typeMap[e.kind] || 'validation-report', { lang: 'zh' });
+        console.log(`[红] 预检没过：${r.oneLiner}`);
+        console.log('请按上面的修复指引改完，再回主菜单选 9 重新提交。');
+      }
+    } else {
+      console.log(`[红] ${e.message}`);
+    }
+  }
+  return 0;
 }
 
 /** 菜单分支 1③：收录第三方能力（git → intake）。
@@ -280,7 +433,8 @@ export async function cmdIntakeFlow(rl, opts = {}) {
     const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir, scope });
     console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes === null ? 'reference scope' : r.sizeBytes + ' bytes'}）`);
     console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
-    printPushReminder();
+    printSubmitHint();
+    printCatalogHint();
     return 0;
   } catch (e) {
     console.log(`黄 收录失败: ${e.message}`);
@@ -347,8 +501,41 @@ export async function cmdWizard(rl, opts = {}) {
   console.log(`下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后运行:`);
   console.log(`  node tools/validate.mjs ${result.destPath}`);
   console.log(`  opsforge status ${result.destPath}`);
-  printPushReminder();
+  printSubmitHint();
+  printCatalogHint();
   return 0;
+}
+
+/** B1: 把远程 index.json 的 summary capabilities（publicEntry 子集）映射成
+ *  renderDiscoverAll 兼容的 inventory entry 形. 远程清单全是 released 态. */
+const QUALITY_TO_LIGHT = { green: '绿', yellow: '黄', red: '红' };
+function indexToInventory(index) {
+  const entries = (index.capabilities || []).map((cap) => ({
+    id: cap.id,
+    version: cap.version,
+    kind: cap.kind,
+    pack: cap.pack,
+    display_name_zh: cap.name,
+    display_name_en: cap.nameEn,
+    description: cap.description,
+    detail: cap.detail || cap.description || '',
+    scenarios: (cap.scenarios || []).join('\n'),
+    scenarioTag: cap.scenarioTag,
+    scope: cap.scope,
+    project: cap.project,
+    sourceOrigin: cap.source && cap.source.key === 'third-party' ? 'third-party' : 'original',
+    example: cap.availability === 'reference-only',
+    light: QUALITY_TO_LIGHT[cap.quality] || '黄',
+    state: 'released',
+    platformSupport: (cap.platformSupport || []).map((p) => ({
+      platform: p.platform, tier: p.tier, hardUnmet: [],
+    })),
+  }));
+  return {
+    all: entries,
+    general: entries.filter((e) => e.scope !== 'project'),
+    brands: {},
+  };
 }
 
 /** opsforge discover — §22.10 改读 per-project manifest（修审计 #1 语义错）。
@@ -362,9 +549,30 @@ export async function cmdDiscover(argsOrOpts) {
   if (opts.all) {
     const { buildInventory, renderDiscoverAll } = await import('./inventory.mjs');
     const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
-    const inv = await buildInventory({ repoRoot: workDir, includeDrafts: !!opts.includeDrafts });
-    console.log(renderDiscoverAll(inv, { lang: 'zh' }));
-    return 0;
+    const repoPresent = ['templates', 'schema', 'tools'].every((d) => fs.existsSync(path.join(workDir, d)));
+    // B1: 远程优先.
+    const fetchFn = opts.fetchRemoteIndex || (await import('./index-fetch.mjs')).fetchRemoteIndex;
+    const officialUrl = opts.officialIndexUrl || (await import('./index-fetch.mjs')).officialIndexUrl;
+    try {
+      const url = process.env.OPSFORGE_INDEX_URL || officialUrl({ repoRoot: workDir });
+      const { index } = await fetchFn({ url, refresh: !!opts.refresh });
+      // index.capabilities (summary 形) → renderDiscoverAll 兼容的 entry 形.
+      const inv = indexToInventory(index);
+      console.log(`● 已连上能力仓（共 ${index.count} 项能力）`);
+      console.log(renderDiscoverAll(inv, { lang: 'zh' }));
+      return 0;
+    } catch {
+      // 失败 + 仓库在 → 本地回退.
+      if (repoPresent) {
+        console.log('○ 暂时连不上能力仓，显示本地已装能力。');
+        const inv = await buildInventory({ repoRoot: workDir, includeDrafts: !!opts.includeDrafts });
+        console.log(renderDiscoverAll(inv, { lang: 'zh' }));
+        return 0;
+      }
+      // 失败 + repo-less → 不提示"主菜单选 8"（那也会失败，避免死循环）.
+      console.log('○ 暂时连不上能力仓，稍后再试或联系团队管理员。');
+      return 0;
+    }
   }
   const project = opts.project || 'default';
   const opsforgeHome = opts.opsforgeHome || resolveOpsforgeHome();
@@ -386,7 +594,7 @@ export async function cmdDiscover(argsOrOpts) {
     const name = (c.id || '').split('.').pop();
     const qLight = c.effectiveness_flag === 'degraded' ? '黄' : '绿';
     const comm = c.commercial === false ? '[黄 不可商用]' : '[绿 可商用]';
-    console.log(`  ${c.id}@${c.version}  ${qLight}  ${comm}  触发 @${name}`);
+    console.log(`  ${c.id}@${c.version}  ${qLight}  ${comm}  触发 @${name}  （主菜单选 8 可看详情）`);
     // methodology §5.4 C4: passive evolve trigger (feedback≤2 or 3rd discover/doctor call).
     try {
       const trig = evolveTriggerSuggest(c.id, opsforgeHome);
@@ -613,40 +821,56 @@ export async function promptInstall(rl, opts = {}) {
  */
 export async function promptInstallFlow(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
+  const out = opts.out || console.log;
   const opsforgeHome = opts.opsforgeHome || resolveOpsforgeHome();
   // ① 选平台（detect 自动探测，回车用自动）
   const detected = detectPlatform({ opsforgeHome });
-  console.log(`--- 安装能力 ---\n① 选目标平台：`);
-  console.log(`   [自动检测] 当前平台：${detected}`);
-  console.log(`   1) claude-code   2) cursor   3) codex   4) cline   5) dify`);
+  out(`--- 安装能力 ---\n① 选目标平台：`);
+  out(`   [自动检测] 当前平台：${detected}`);
+  out(`   1) claude-code   2) cursor   3) codex   4) cline   5) dify`);
   const platAns = (await ask('选 [1-5] 或回车用自动检测: ')).trim();
   const platform = platAns === '' ? detected : (PLATFORMS[Number(platAns) - 1] || detected);
   // ② 选安装方式
-  console.log(`② 选安装方式：`);
-  console.log(`   1) 从 pack 安装   2) 从 bundle 安装   3) 从 profile 安装   4) 单个能力安装`);
+  out(`② 选安装方式：`);
+  out(`   1) 从 pack 安装   2) 从 bundle 安装   3) 从 profile 安装   4) 单个能力安装`);
   const methodAns = (await ask('选 [1-4]: ')).trim();
   const method = methodAns || '4';
   // ③ 浏览能力（列已装 manifest 或 registry）+ ④ 确认依赖
   const capId = (await ask('③ 输入能力 id（如 marketing-team.copywriter）: ')).trim();
   assertCapId(capId);
-  console.log(`④ 确认依赖：将检查 ${capId} 的依赖能力。`);
+  out(`④ 确认依赖：将检查 ${capId} 的依赖能力。`);
   // ⑤ 确认安装
   const confirmAns = (await ask('⑤ 确认安装 [Y/n]: ')).trim().toLowerCase();
   const confirm = confirmAns === '' || confirmAns === 'y' || confirmAns === 'yes';
   if (!confirm) {
-    console.log('已取消安装。');
+    out('已取消安装。');
     return { platform, method, capId, project: opts.project || 'default', confirm: false };
   }
   // 执行安装（转发 install.mjs）
   if (!opts.dryRun) {
-    const { install } = await import('../install.mjs');
+    const { install, RemoteHintError, RemoteNotFoundError } = await import('../install.mjs');
     const workDir = opts.workDir || resolveWorkDir({ opsforgeHome }).dir;
+    const installFn = opts.install || install;
     try {
-      const r = await install({ platform, capId, project: opts.project || 'default', repoRoot: workDir, opsforgeHome });
-      console.log(`绿 安装完成：${r.installed.join(', ')}`);
+      const r = await installFn({ platform, capId, project: opts.project || 'default', repoRoot: workDir, opsforgeHome });
+      out(`绿 安装完成：${r.installed.join(', ')}`);
     } catch (e) {
-      console.log(`[红] 安装失败：${e.message}`);
+      if (e?.name === 'RemoteHintError') {
+        // 第三方能力 + installHint：指向 installFromGit，对用户只说"来源网址"不出现 git 字样.
+        out(`这能力来自社区。要装到本地，请回主菜单选 2，把来源网址粘贴进去即可。`);
+      } else if (e?.name === 'RemoteNotFoundError') {
+        // 官方能力无仓库：业务话，不给用户做不到的指令.
+        out(`这能力在能力仓里找到了。要装到本地，需要团队管理员先帮你装一次（只需一次）。请联系团队管理员。`);
+      } else {
+        out(`[红] 安装失败：${e.message}`);
+      }
     }
+  }
+  // A2 深链可见性规则：server 在跑→可点击链接；未跑→业务指引（不裸露 URL）。
+  if (opts.catalogServerRunning) {
+    out(`查看这能力的详情（目录）: http://127.0.0.1:${opts.catalogServerPort}/capabilities/${encodeURIComponent(capId)}`);
+  } else {
+    out(PRINT_TOPICS['catalog-hint']);
   }
   return { platform, method, capId, project: opts.project || 'default', confirm };
 }
