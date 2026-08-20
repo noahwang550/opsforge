@@ -8,8 +8,10 @@ import path from 'node:path';
 import {
   PLATFORM_DIRS,
   PLATFORM_MCP_PATHS,
+  PLATFORM_MCP_FORMATS,
   platformInstallDir,
   mcpConfigPathFor,
+  mcpConfigFormatFor,
   detectPlatform,
   detectAllPlatforms,
   isExecutableEntrypoint,
@@ -82,6 +84,15 @@ test('PD6 platformInstallDir + mcpConfigPathFor return correct paths', () => {
   const mcp = mcpConfigPathFor('workbuddy');
   assert.ok(dir.endsWith(path.join('.workbuddy')), dir);
   assert.ok(mcp.endsWith(path.join('.workbuddy', 'mcp.json')), mcp);
+  // codex：MCP 配置为 ~/.codex/config.toml（TOML）
+  const codexMcp = mcpConfigPathFor('codex');
+  assert.ok(codexMcp.endsWith(path.join('.codex', 'config.toml')), codexMcp);
+  assert.equal(mcpConfigFormatFor('codex'), 'toml');
+  assert.equal(PLATFORM_MCP_FORMATS.codex, 'toml');
+  // 其余平台一律 json（默认）
+  assert.equal(mcpConfigFormatFor('claude-code'), 'json');
+  assert.equal(mcpConfigFormatFor('dify'), 'json');
+  assert.equal(mcpConfigFormatFor('workbuddy'), 'json');
   // dify 无本地 mcp 配置 → null
   assert.equal(mcpConfigPathFor('dify'), null);
   // 未知平台 → null

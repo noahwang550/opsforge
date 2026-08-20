@@ -201,11 +201,19 @@ export const PLATFORM_DIRS = {
 export const PLATFORM_MCP_PATHS = {
   'claude-code': '.claude.json',
   'cursor': '.cursor/mcp.json',
-  'codex': '.codex/config.json',
+  'codex': '.codex/config.toml',
   'cline': '.cline/mcp_settings.json',
   'dify': null,
   'workbuddy': '.workbuddy/mcp.json',
 };
+
+/** MCP 配置文件格式（未列出的平台一律 'json'；codex 为 TOML）。 */
+export const PLATFORM_MCP_FORMATS = { codex: 'toml' };
+
+/** 平台 MCP 配置文件格式：'json' | 'toml'。 */
+export function mcpConfigFormatFor(platform) {
+  return PLATFORM_MCP_FORMATS[platform] || 'json';
+}
 
 /** 平台安装根目录绝对路径（未知平台 → null）。 */
 export function platformInstallDir(platform) {

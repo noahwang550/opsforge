@@ -16,6 +16,7 @@ import {
   detectAllPlatforms,
   platformInstallDir,
   mcpConfigPathFor,
+  mcpConfigFormatFor,
 } from './tools/paths.mjs';
 import { assertPublicUrl } from './tools/intake-fetch.mjs';
 import { isOfficialIndexHost } from './tools/index-fetch.mjs';
@@ -40,6 +41,12 @@ function parseManifest(manifestPath) {
     if (m) raw = m[1];
   }
   return yaml.load(raw, { filename: manifestPath });
+}
+
+// codex 专用：TOML 文本中是否存在 [mcp_servers.<key>] 表头（含 .env 子表）。
+function hasTomlMcpServerHeader(tomlText, key) {
+  const esc = String(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('^[ \\t]*\\[mcp_servers\\.' + esc + '[.\\]]', 'm').test(tomlText);
 }
 
 /** Phase 3.6 落点 6: registry 回退——仓库内 registry.yaml 优先（fresh），
@@ -642,10 +649,16 @@ export async function doctor(args) {
   // S3: mcp 检查走 mcpConfigPathFor（dify 无本地 mcp 配置 → 跳过）.
   const mcpCfgPath = mcpConfigPathFor(platform);
   if (mcpCfgPath) {
-    const mcpJson = readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} };
+    // codex 的 MCP 配置为 TOML：按 [mcp_servers.<key>] 表头判存在；其余平台走 JSON。
+    const mcpIsToml = mcpConfigFormatFor(platform) === 'toml';
+    const mcpJson = mcpIsToml ? null : (readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} });
+    const mcpToml = mcpIsToml && fs.existsSync(mcpCfgPath) ? fs.readFileSync(mcpCfgPath, 'utf8') : '';
     for (const cap of manifest.capabilities) {
       for (const key of cap.mcp_keys || []) {
-        if (!mcpJson.mcpServers || !mcpJson.mcpServers[key]) {
+        const mcpMissing = mcpIsToml
+          ? !hasTomlMcpServerHeader(mcpToml, key)
+          : (!mcpJson.mcpServers || !mcpJson.mcpServers[key]);
+        if (mcpMissing) {
           issues.push({ severity: 'medium', check: 'mcp_missing', detail: `MCP server "${key}" for ${cap.id} not in ${mcpCfgPath}`, fix: `Reinstall ${cap.id} or manually add MCP config` });
         }
       }
@@ -809,8 +822,11 @@ export async function repair(args) {
     if (cap.mcp_keys && cap.mcp_keys.length) {
       const mcpCfgPath = mcpConfigPathFor(platform);
       if (mcpCfgPath) {
-        const cfg = readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} };
-        const missingKeys = cap.mcp_keys.filter((k) => !cfg.mcpServers || !cfg.mcpServers[k]);
+        // codex 为 TOML：按表头判缺失；其余平台走 JSON。重注入仍调 adapter.injectMcp()。
+        const mcpIsToml = mcpConfigFormatFor(platform) === 'toml';
+        const mcpToml = mcpIsToml && fs.existsSync(mcpCfgPath) ? fs.readFileSync(mcpCfgPath, 'utf8') : '';
+        const cfg = mcpIsToml ? null : (readJsonOrNullSync(mcpCfgPath) || { mcpServers: {} });
+        const missingKeys = cap.mcp_keys.filter((k) => mcpIsToml ? !hasTomlMcpServerHeader(mcpToml, k) : (!cfg.mcpServers || !cfg.mcpServers[k]));
         if (missingKeys.length > 0) {
           try {
             const capDir = findCapabilitySource(cap.id, repoRoot);
