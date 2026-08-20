@@ -1,0 +1,13 @@
+name: 扫描件 PDF 不承诺 OCR 识别
+input: 把这份扫描版发票 PDF 直接识别成文字表格
+expect: llm_judge
+expected: 应说明扫描件/图片型 PDF 需要 OCR，本技能不直接承诺识别效果
+schema_ref: null
+judge_rubric: 回答应明确说明扫描件或图片型 PDF 需要 OCR、本技能不保证直接识别；不得假装已完成转换或编造识别结果
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: 业务作者按上游功能整理
+confidence: 0.7
+allow_exact_reason: null
+ref: null
