@@ -54,8 +54,12 @@ AnyDoc 把常见办公文档（Word、PowerPoint、Excel、OpenDocument、RTF、
 
 ## 运行指令
 
-接收用户提供的文档（路径或上传文件），用 anydoc 转成 Markdown，检查输出质量后交付 .md 结果；不支持的格式按“失败降级”处理。
+1. 先按扩展名判断格式，支持清单：.docx / .pptx / .xlsx / .odt / .rtf / .epub / .csv / .pdf。只要用户提到的格式不在清单内（如 .zip / .rar / .7z / 图片等），立即明确告知"该格式不受支持"并列出支持清单、请用户转换格式后重试——不要索要文件、不要尝试转换。格式在清单内时，再接收本地路径（如 ./report.docx）或上传的文件。用户直接粘贴文本内容（如 CSV）时，无需落盘，直接在回复中转换并返回 Markdown。
+2. 调用 anydoc 运行时执行转换：Node.js 绑定示例 `const { convert } = require('anydoc'); const md = await convert(inputPath)`；Python 绑定示例 `import anydoc; md = anydoc.convert(input_path)`。
+3. 校验输出：Markdown 必须非空、标题层级与表格结构完整可读；若为扫描件 / 图片型 PDF、结果为空或乱码，按"失败降级"如实告知，绝不假装转换成功。
+4. 交付：保存为同名 .md 文件（或用户指定路径），并在对话中说明输出位置与任何降级提示。
+
 
 ## 蒸馏日志
 
-- 2026-08-20 第三方收录自 firecrawl/anydoc @7df4b2e（MIT 许可），按上游功能描述整理填写（来自实录步骤1）
+- 2026-08-20 第三方收录自 firecrawl/anydoc @7df4b2e（MIT 许可），按上游功能描述整理"识别并转换文档"的支持格式清单（Word / Excel / PDF 等）与失败降级路径（来自实录步骤1）

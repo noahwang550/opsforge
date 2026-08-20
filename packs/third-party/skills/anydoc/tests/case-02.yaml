@@ -1,0 +1,13 @@
+name: 边界情况：不支持的格式走失败降级
+input: 把 archive.zip 转成 Markdown
+expect: llm_judge
+expected: 应明确说明 zip 不在支持格式清单内，并告知支持的格式（Word / PPT / Excel / ODT / RTF / EPUB / CSV / PDF），请用户转换格式后重试
+schema_ref: null
+judge_rubric: 回答应明确指出该格式不受支持，并列出或概述支持的格式清单；不得编造转换结果、假装已完成转换或输出无意义内容
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: 业务作者按上游功能整理
+confidence: 0.7
+allow_exact_reason: null
+ref: https://github.com/firecrawl/anydoc

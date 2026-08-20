@@ -1,4 +1,4 @@
-name: 扫描件 PDF 不承诺 OCR 识别
+name: 负例：扫描件 PDF 不承诺 OCR 识别
 input: 把这份扫描版发票 PDF 直接识别成文字表格
 expect: llm_judge
 expected: 应说明扫描件/图片型 PDF 需要 OCR，本技能不直接承诺识别效果

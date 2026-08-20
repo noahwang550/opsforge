@@ -121,6 +121,7 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | `data-team.data-quality-profiler` | 数据库数据质量体检 | skill | claude-code(T1) · workbuddy(T2) | CRM 分析项目启动前，对客户业务库做首次数据质量摸底 | 已发布 | 0.2.0 |
 | `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) · workbuddy(T2) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) · workbuddy(T2) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
+| `third-party.anydoc` | AnyDoc 文档转 Markdown | skill | claude-code(T1) | 把收到的 Word 方案、Excel 报表、PDF 报告转成 Markdown，交给 AI 做摘要、翻译或二次加工 | 已发布 | 0.1.0 |
 | `third-party.marketingskills` | AI 代理营销技能包 | skill | claude-code(T1) · workbuddy(T2) | 技术营销人员或创始人想让 AI 编码代理代写落地页文案、邮件序列、社媒帖、广告创意 | 已发布 | 0.1.0 |
 | `third-party.member-recall` | 会员召回 | skill | claude-code(T1) · workbuddy(T2) | 沉睡会员激活 / 流失会员挽回，需要一套可执行的生产级召回流程 | 已发布 | 0.1.0 |
 | `third-party.sy-automl-mcp` | AutoML 建模连接器 | mcp | claude-code(T1) · workbuddy(T2) | 业务运营有一张 CSV 表格，想快速得到一个可用的预测模型（如销量预测、流失预测）。 | 已发布 | 0.1.0 |

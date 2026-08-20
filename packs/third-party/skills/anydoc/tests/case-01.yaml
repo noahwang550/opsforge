@@ -1,0 +1,13 @@
+name: 正常转换 CSV 内容为 Markdown
+input: 直接把下面这段 CSV 文本转成 Markdown 表格并在回复中返回（不要写入文件）：产品,库存\n机械键盘,120\n无线鼠标,350
+expect: contains
+expected: 机械键盘
+schema_ref: null
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: positive
+source: recalled
+confidence: 0.8
+allow_exact_reason: null
+ref: https://github.com/firecrawl/anydoc
