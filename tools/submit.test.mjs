@@ -105,7 +105,11 @@ test('SU5 submit happy path opens PR', async () => {
       return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }) };
     }
     // step3: POST refs/heads/{branch} → 建分支
-    if (url.includes('/git/refs/heads/opsforge-') && init?.method === 'POST') {
+    // step3: create ref -> POST /git/refs with body { ref: 'refs/heads/<branch>', sha }
+    if (url.endsWith('/git/refs') && init?.method === 'POST') {
+      const body = JSON.parse(init.body);
+      assert.ok(body.ref.startsWith('refs/heads/opsforge-foo-bar-'), 'ref must be refs/heads/<branch>');
+      assert.equal(body.sha, 'basesha123');
       return { ok: true, status: 201, json: async () => ({ object: { sha: 'basesha123' } }) };
     }
     // step4: POST trees

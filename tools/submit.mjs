@@ -257,9 +257,11 @@ export async function callGithubApi({ gh, draftDir, repoRoot, token, fetchImpl, 
 
   // step3: 建分支（若不存在）
   if (!branchExists) {
-    await ghMust(`${base}/git/refs/heads/${branchName}`, {
+    // GitHub create-ref: POST /git/refs with body { ref: "refs/heads/<branch>", sha }.
+    // POSTing to /git/refs/heads/<branch> is not a valid endpoint -> GitHub 422.
+    await ghMust(`${base}/git/refs`, {
       method: 'POST',
-      body: JSON.stringify({ sha: baseSha }),
+      body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
       headers: { 'Content-Type': 'application/json' },
     });
   }
