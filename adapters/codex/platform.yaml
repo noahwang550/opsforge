@@ -6,14 +6,11 @@ capability_points:
     supported: true
     mode: cli
   agent_file:
-    supported: false
-    fallback: manual-paste
+    supported: true
   skill_file:
-    supported: false
-    fallback: manual-paste
+    supported: true
   slash_command:
-    supported: false
-    fallback: manual-paste
+    supported: true
   mcp_config:
     supported: true
   workflow_orchestration:

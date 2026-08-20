@@ -56,7 +56,7 @@ node tools/opsforge-bootstrap.mjs --platform claude-code --project default
 ### 其它平台
 
 - Cursor / Cline：同 bootstrap 模式（改 `--platform`）
-- Codex：CLI 模式同上；纯 API 无终端退 manual-paste
+- Codex：原生落盘（agents/*.toml、skills/、prompts/workflow-*.md、config.toml [mcp_servers.*] 块级合并）
 - Dify：**做不到平台内安装**（Web 平台无可写配置目录），退 manual-paste 说明书——诚实兜底，不硬凑
 
 ## 命令速查
@@ -101,7 +101,7 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | claude-code | 1 | ✅ 可行（agent+terminal） |
 | cursor | 1 | ✅ 可行 |
 | cline | 1 | ✅ 可行 |
-| codex | 2 | ⚠ 部分（manual-paste/http-inject 回退） |
+| codex | 1 | ✅ 可行（原生落盘 agents/skills/prompts/config.toml） |
 | dify | 3 | ❌ 退 manual-paste |
 | workbuddy | 2 | ⚠ 部分（agent→skill cli-engine / mcp→mcp.json 合并 / workflow→引导式 skill） |
 

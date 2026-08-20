@@ -448,18 +448,18 @@ test('FB4 recordFeedback appends a rating', async () => {
 // ---------- Phase 3.3: --downgrade ----------
 
 // DG1 install --downgrade on a Tier-2 platform installs with degradation instead of failing conform
-test('DG1 install --downgrade installs agent on codex via manual-paste', async () => {
+test('DG1 install --downgrade installs agent on dify via manual-paste', async () => {
   const tmp = mkTmp();
   const home = mkTmp();
   process.env.OPSFORGE_HOME = home;
-  fs.mkdirSync(path.join(home, '.codex'), { recursive: true });
-  // agent with requires:hard agent_file (unsupported on codex)
+  fs.mkdirSync(path.join(home, '.dify'), { recursive: true });
+  // agent with requires:hard agent_file (unsupported on dify)
   const capDir = path.join(tmp, 'packs', 'foo', 'agents', 'bar');
   fs.mkdirSync(path.join(capDir, 'tests'), { recursive: true });
   fs.writeFileSync(path.join(capDir, 'capability.yaml'), yaml.dump({
     id: 'foo.bar', version: '1.0.0', kind: 'agent', pack: 'foo', owner: 'foo',
     display_name: 'Bar', display_name_zh: 'Bar', display_name_en: 'Bar',
-    description: 'desc', platforms: ['codex'],
+    description: 'desc', platforms: ['dify'],
     entrypoint: 'source.md', tests: 'tests/', changelog: 'CHANGELOG.md',
     depends_on: [], source: { origin: 'original', upstream_ref: null },
     requires: [{ point: 'agent_file', severity: 'hard' }],
@@ -468,15 +468,54 @@ test('DG1 install --downgrade installs agent on codex via manual-paste', async (
   for (let i = 0; i < 3; i++) fs.writeFileSync(path.join(capDir, 'tests', `case-0${i+1}.yaml`), yaml.dump({ name: `c${i}`, input: `i${i}`, expect: 'exact', expected: `e${i}` }));
   fs.writeFileSync(path.join(capDir, 'CHANGELOG.md'), '# bar\n');
   const { install } = await import('./install.mjs');
-  // Without --downgrade: conform fails (requires:hard agent_file unsupported on codex)
-  await assert.rejects(() => install({ platform: 'codex', capId: 'foo.bar', repoRoot: tmp, opsforgeHome: home }), /agent_file|conform/i);
+  // Without --downgrade: conform fails (requires:hard agent_file unsupported on dify)
+  await assert.rejects(() => install({ platform: 'dify', capId: 'foo.bar', repoRoot: tmp, opsforgeHome: home }), /agent_file|conform/i);
   // With --downgrade: installs (manual-paste artifact, nothing written to disk but success)
-  const r = await install({ platform: 'codex', capId: 'foo.bar', repoRoot: tmp, opsforgeHome: home, downgrade: true });
+  const r = await install({ platform: 'dify', capId: 'foo.bar', repoRoot: tmp, opsforgeHome: home, downgrade: true });
   assert.ok(Array.isArray(r.installed));
   // manifest records the cap with a degradation note
   const m = JSON.parse(fs.readFileSync(path.join(home, 'manifests', 'default.manifest.json'), 'utf8'));
   const entry = m.capabilities.find((c) => c.id === 'foo.bar');
   assert.ok(entry, 'manifest should record the downgraded install');
+});
+
+// S3-codex doctor 按 TOML 表头检测 mcp key（codex 的 MCP 配置为 config.toml）
+test('S3-codex doctor mcp_missing detection via config.toml TOML headers', async () => {
+  const home = mkTmp();
+  process.env.OPSFORGE_HOME = home;
+  fs.mkdirSync(path.join(home, '.codex'), { recursive: true });
+  fs.mkdirSync(path.join(home, 'manifests'), { recursive: true });
+  const manifest = {
+    manifest_version: '1', project: 'default', platform: 'codex', brand: null,
+    installer_version: '0.1.0',
+    capabilities: [
+      { id: 'itl-eng.coder', version: '0.1.0', artifacts: [], mcp_keys: ['coder'], deps_missing: [] },
+      { id: 'itl-eng.gone', version: '0.1.0', artifacts: [], mcp_keys: ['gone'], deps_missing: [] },
+    ],
+  };
+  fs.writeFileSync(path.join(home, 'manifests', 'default.manifest.json'), JSON.stringify(manifest));
+  fs.writeFileSync(path.join(home, '.codex', 'config.toml'), 'shell = "bash"\n\n[mcp_servers.coder]\ncommand = "cmd"\n');
+  const r = await doctor({ platform: 'codex', opsforgeHome: home });
+  const mcpIssues = r.issues.filter((i) => i.check === 'mcp_missing');
+  assert.equal(mcpIssues.length, 1, 'only the absent key flagged');
+  assert.ok(mcpIssues[0].detail.includes('gone'), 'flagged key is the missing one');
+});
+
+test('S3-codex doctor flags every mcp key when config.toml absent', async () => {
+  const home = mkTmp();
+  process.env.OPSFORGE_HOME = home;
+  fs.mkdirSync(path.join(home, '.codex'), { recursive: true });
+  fs.mkdirSync(path.join(home, 'manifests'), { recursive: true });
+  const manifest = {
+    manifest_version: '1', project: 'default', platform: 'codex', brand: null,
+    installer_version: '0.1.0',
+    capabilities: [
+      { id: 'itl-eng.coder', version: '0.1.0', artifacts: [], mcp_keys: ['coder'], deps_missing: [] },
+    ],
+  };
+  fs.writeFileSync(path.join(home, 'manifests', 'default.manifest.json'), JSON.stringify(manifest));
+  const r = await doctor({ platform: 'codex', opsforgeHome: home });
+  assert.ok(r.issues.some((i) => i.check === 'mcp_missing'), 'missing config.toml → key flagged');
 });
 
 // ---------- F2: dify platform reachability ----------

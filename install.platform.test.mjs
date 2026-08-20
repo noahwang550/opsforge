@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { doctor } from './install.mjs';
+import { doctor, repair } from './install.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = __dirname;
@@ -119,4 +119,54 @@ test('CLI2 doctor --platform workbuddy exits 0 (CLI argv)', () => {
   });
   assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
   assert.match(r.stdout, /healthy: true/);
+});
+
+// RP1-codex repair --repair-mcp TOML 分支：缺 key → injectMcp 重注入；不缺 → 文件零改动
+test('RP1 codex repair re-injects missing mcp key into config.toml', async () => {
+  const home = mkTmp();
+  const repo = mkTmp();
+  process.env.OPSFORGE_HOME = home;
+  makeDir(home, '.codex');
+  // 源能力：packs/itl-eng/mcps/coder/
+  const capDir = path.join(repo, 'packs', 'itl-eng', 'mcps', 'coder');
+  fs.mkdirSync(capDir, { recursive: true });
+  fs.writeFileSync(path.join(capDir, 'server.mjs'), '// mcp server');
+  const yaml = (await import('js-yaml')).default;
+  fs.writeFileSync(path.join(capDir, 'capability.yaml'), yaml.dump({
+    id: 'itl-eng.coder', version: '0.1.0', kind: 'mcp', pack: 'itl-eng', owner: 'x',
+    display_name: 'Coder', display_name_zh: 'C', display_name_en: 'C',
+    description: 'd', platforms: ['codex'],
+    entrypoint: 'server.mjs', tests: 'tests/', changelog: 'CHANGELOG.md',
+    transport: 'stdio', config_template: { auth_schema: ['API_KEY'] }, tools: [],
+    depends_on: [], source: { origin: 'original', upstream_ref: null },
+  }));
+  const cfgPath = path.join(home, '.codex', 'config.toml');
+  const preExisting = 'shell = "bash"\n\n[mcp_servers.other]\ncommand = "x"\n';
+  fs.writeFileSync(cfgPath, preExisting);
+  const manifest = {
+    manifest_version: '1', project: 'default', platform: 'codex', brand: null,
+    installer_version: '0.1.0',
+    capabilities: [
+      { id: 'itl-eng.coder', version: '0.1.0', artifacts: [], mcp_keys: ['coder'], deps_missing: [] },
+    ],
+  };
+  fs.mkdirSync(path.join(home, 'manifests'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'manifests', 'default.manifest.json'), JSON.stringify(manifest));
+
+  // 缺 coder → 重注入，既有表保留
+  const r1 = await repair({ platform: 'codex', repoRoot: repo, opsforgeHome: home });
+  assert.deepEqual(r1.issues, []);
+  assert.ok(r1.repaired.includes('itl-eng.coder'), 're-injected missing key');
+  const after = fs.readFileSync(cfgPath, 'utf8');
+  assert.ok(after.includes('[mcp_servers.coder]'), 'coder block injected');
+  assert.ok(after.includes('env_vars = ["API_KEY"]'), 'auth_schema re-injected');
+  assert.ok(after.includes('[mcp_servers.other]'), 'pre-existing table preserved');
+  assert.ok(after.startsWith(preExisting), 'pre-existing bytes untouched');
+
+  // 不缺 → 文件零改动，repaired 为空
+  const before2 = fs.readFileSync(cfgPath, 'utf8');
+  const r2 = await repair({ platform: 'codex', repoRoot: repo, opsforgeHome: home });
+  assert.deepEqual(r2.issues, []);
+  assert.deepEqual(r2.repaired, [], 'nothing to repair when key present');
+  assert.equal(fs.readFileSync(cfgPath, 'utf8'), before2, 'no rewrite when nothing missing');
 });
