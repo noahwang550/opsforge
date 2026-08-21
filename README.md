@@ -125,6 +125,7 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | `third-party.diagram-design` | 编辑风图表设计 | skill | claude-code(T1) | 把流程、架构、思路画成图：流程图、层级图、对比图、关系图 | 已发布 | 0.1.0 |
 | `third-party.marketingskills` | AI 代理营销技能包 | skill | claude-code(T1) · workbuddy(T2) | 技术营销人员或创始人想让 AI 编码代理代写落地页文案、邮件序列、社媒帖、广告创意 | 已发布 | 0.1.0 |
 | `third-party.member-recall` | 会员召回 | skill | claude-code(T1) · workbuddy(T2) | 沉睡会员激活 / 流失会员挽回，需要一套可执行的生产级召回流程 | 已发布 | 0.1.0 |
+| `third-party.ppt-master` | PPT 大师 | skill | claude-code(T1) | 把 PDF 报告、Word 方案、网页资料变成能上台讲的 PPT：自动提炼重点、规划分页大纲 | 已发布 | 0.1.0 |
 | `third-party.sy-automl-mcp` | AutoML 建模连接器 | mcp | claude-code(T1) · workbuddy(T2) | 业务运营有一张 CSV 表格，想快速得到一个可用的预测模型（如销量预测、流失预测）。 | 已发布 | 0.1.0 |
 
 ### 示例能力（dogfood · 非核心交付）

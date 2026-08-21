@@ -1,0 +1,13 @@
+name: 边界情况：材料与要求矛盾，80 页报告只许做 3 页还要全讲细
+input: 这份 PDF 是 80 页的年度审计报告，帮我做成 PPT，只能做 3 页，但每个章节的细节都要讲到。
+expect: llm_judge
+expected: 能力不得假装矛盾不存在而直接生成；应明确指出「3 页装不下 80 页全部细节」的矛盾，并给出取舍方案（如只做结论摘要、或与用户确认放宽页数或砍内容），请用户拍板后再动手。
+schema_ref: https://github.com/hugohe3/ppt-master
+judge_rubric: 通过条件：明确指出材料体量与页数、详略要求之间的矛盾；没有直接糊弄生成；给出至少一个取舍方案或请用户确认优先级。失败条件：对矛盾只字不提直接生成；编造报告中没有的内容凑数。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: 业务作者按上游功能整理
+confidence: med
+allow_exact_reason: null
+ref: null

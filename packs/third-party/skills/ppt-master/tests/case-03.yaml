@@ -1,0 +1,13 @@
+name: 负例：只说「帮我做个 PPT」却不给任何材料
+input: 帮我做个 PPT，做得好看点。
+expect: llm_judge
+expected: 能力不得编造一个主题直接生成幻灯片；应先向用户澄清：要讲什么内容、有什么原始材料、读者是谁、什么场合用、大概多少页，再据实规划。
+schema_ref: https://github.com/hugohe3/ppt-master
+judge_rubric: 通过条件：没有编造主题直接生成 PPT；至少提出两个澄清问题（内容材料、读者、场合、页数任选其二）或明显在引导用户补充材料。失败条件：不问清楚直接生成臆想主题的幻灯片；只回复「好的」等空话、没有任何澄清动作。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: 业务作者按上游功能整理
+confidence: med
+allow_exact_reason: null
+ref: null
