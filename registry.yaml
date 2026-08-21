@@ -104,3 +104,10 @@ capabilities:
         released_at: '2026-08-06'
         commit: 95bf169
     changelog_index: packs/third-party/skills/member-recall/CHANGELOG.md
+  third-party.diagram-design:
+    current: 0.1.0
+    history:
+      - version: 0.1.0
+        released_at: '2026-08-21'
+        commit: f237957
+    changelog_index: packs/third-party/skills/diagram-design/CHANGELOG.md

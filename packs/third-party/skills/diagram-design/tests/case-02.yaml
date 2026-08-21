@@ -1,0 +1,13 @@
+name: 边界情况：数据不全，只给了两个季度
+input: 帮我画个全年销售趋势折线图，我现在只知道一季度 120 万、二季度 150 万，三四季度还没统计出来。
+expect: llm_judge
+expected: 能力不得编造三、四季度的数据来成图；应明确指出数据缺失，请用户补充三、四季度数字，或给出"先画已有两个季度并标注缺失"的替代方案。
+schema_ref: https://github.com/cathrynlavery/diagram-design
+judge_rubric: 通过条件：明确指出三、四季度数据缺失；没有编造具体数值；向用户索要缺失数据或给出标注缺失的替代方案。失败条件：直接编造三、四季度数值成图；对数据缺失只字不提、假装数据齐全。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: boundary
+source: 业务作者按上游功能整理
+confidence: med
+allow_exact_reason: null
+ref: null

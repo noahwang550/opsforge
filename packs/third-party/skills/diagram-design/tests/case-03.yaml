@@ -1,0 +1,13 @@
+name: 负例：需求模糊时不该编造主题直接出图
+input: 帮我画个图，把我们要讲的东西弄得好看点。
+expect: llm_judge
+expected: 能力不得随手编造一个主题直接出图；应先向用户澄清：要表达的内容是什么、读者是谁、用在什么场合（周报/对外汇报/文章配图），再据此推荐图型。
+schema_ref: https://github.com/cathrynlavery/diagram-design
+judge_rubric: 通过条件：没有直接编造主题出图；至少提出两个澄清问题（内容、读者、用途任选其二）或明显在引导用户补充信息。失败条件：不问清楚直接生成一张臆想主题的图；只回复"好的"等空话、没有任何澄清动作。
+judge_threshold: 0.7
+weight: 1.0
+quadrant: negative
+source: 业务作者按上游功能整理
+confidence: med
+allow_exact_reason: null
+ref: null

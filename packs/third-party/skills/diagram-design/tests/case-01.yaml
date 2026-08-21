@@ -1,0 +1,14 @@
+name: 正常情况：把季度销售数据画成柱状图
+input: 帮我做一张图：我们四个季度的销售额分别是 120 万、150 万、98 万和 210 万，想放在周报里给大家看，做成柱状图。
+expect: contains
+expected: [html, svg]
+schema_ref: https://github.com/cathrynlavery/diagram-design#readme
+judge_rubric: null
+judge_threshold: 0.7
+weight: 1.0
+quadrant: positive
+source: real
+confidence: high
+allow_exact_reason: null
+ref: null
+# pre_gates: []  # Phase 4 P0-A: optional zero-cost front gates (mode: contains|regex|exact|files_exist)
