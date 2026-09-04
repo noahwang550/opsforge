@@ -1,0 +1,11 @@
+name: simple-skill-routing
+input:
+  kind: skill
+  name: 帮我写周报
+expect: contains
+expected: 单一 Skill
+quadrant: positive
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null

@@ -23,7 +23,7 @@ function runPrint(topic) {
 
 // WC1 PRINT_TOPICS 业务文案不含禁用词（CLI argv 路径 spawnSync）。
 test('WC1 business topics contain no forbidden words', () => {
-  const topics = ['new-flow', 'wizard-routing', 'error-recovery', 'distiller-steps', 'wizard-phases', 'catalog-hint', 'submit-flow', 'submit-hint'];
+  const topics = ['new-flow', 'wizard-routing', 'error-recovery', 'distiller-steps', 'wizard-phases', 'catalog-hint', 'export-flow', 'export-hint'];
   for (const t of topics) {
     const content = runPrint(t);
     assert.doesNotMatch(content, FORBIDDEN_RE, `topic "${t}" contains a forbidden word`);
@@ -34,7 +34,7 @@ test('WC1 business topics contain no forbidden words', () => {
 test('WC2 menu has 8/9 options and no forbidden words', () => {
   const content = runPrint('menu');
   assert.match(content, /8\) 打开能力目录/);
-  assert.match(content, /9\) 提交我的能力/);
+  assert.match(content, /9\) 导出能力/);
   assert.doesNotMatch(content, FORBIDDEN_RE);
 });
 

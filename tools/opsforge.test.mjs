@@ -474,13 +474,13 @@ test('OP23 cmdPrint emits menu topic verbatim', async () => {
 });
 
 // OP24 cmdPrint emits new-flow topic with ③ third-party branch (the drift bug fix).
-test('OP24 cmdPrint new-flow includes ③ third-party branch', async () => {
+test('OP24 cmdPrint new-flow includes ② third-party branch', async () => {
   const { cmdPrint } = await import('./opsforge.mjs');
   const captured = [];
   const code = await cmdPrint(['new-flow'], { out: (s) => captured.push(s) });
   assert.equal(code, 0);
   const text = captured.join('\n');
-  assert.ok(text.includes('③ 收录第三方能力'), 'third-party branch present');
+  assert.ok(text.includes('② 收录第三方能力'), 'third-party branch present');
 });
 
 // OP25 cmdPrint returns 1 on unknown topic + lists available.
@@ -609,51 +609,43 @@ test('OP-CAT2 cmdCatalogFlow server fails prints business hint', async () => {
   }
 });
 
-// ---------- B1: cmdSubmitFlow ----------
+// ---------- B1: cmdExportFlow ----------
 
-// OP21 cmdSubmitFlow 选草稿+预检+submit 成功打印业务话结果。
-test('OP21 cmdSubmitFlow submits draft and prints business result', async () => {
-  const { cmdSubmitFlow } = await import('./opsforge.mjs');
+// OP21 cmdExportFlow 选草稿+预检+export 成功打印业务话结果。
+test('OP21 cmdExportFlow exports draft and prints business result', async () => {
+  const { cmdExportFlow } = await import('./opsforge.mjs');
   const tmp = mkTmp();
   fs.mkdirSync(tmp, { recursive: true });
   const draftPath = path.join(tmp, 'foo', 'bar');
   fs.mkdirSync(draftPath, { recursive: true });
-  // pre-seed submit token so no first-time prompt
-  const home = mkTmp();
-  const origHome = process.env.OPSFORGE_HOME;
-  process.env.OPSFORGE_HOME = home;
-  fs.mkdirSync(path.join(home, '.opsforge'), { recursive: true });
-  fs.writeFileSync(path.join(home, '.opsforge', 'submit-token.json'), JSON.stringify({ token: 'preseeded' }));
   const captured = [];
   const origLog = console.log;
   console.log = (s) => captured.push(String(s));
   try {
     const rl = mockRl(['1', 'y']);
-    const code = await cmdSubmitFlow(rl, {
+    const code = await cmdExportFlow(rl, {
       workDir: tmp,
-      opsforgeHome: home,
       listDrafts: () => [{ slug: 'foo', name: 'bar', kind: 'skill', path: draftPath, mtime: Date.now(), hasFillMe: true }],
-      submit: async () => ({ prUrl: 'https://github.com/o/r/pull/1', branch: 'b', commitSha: 'c', updated: false }),
+      exportFn: async () => ({ zipPath: '/tmp/export.zip', zipName: 'skill-foo-bar-v0.1.0.opsforge.zip', cap: { id: 'foo.bar', kind: 'skill' } }),
     });
     assert.equal(code, 0);
-    assert.ok(captured.some((s) => s.includes('已提交') && s.includes('提交进度页')), 'should print submit success');
-    assert.ok(captured.some((s) => s.includes('运营团队会审核')), 'should print review hint');
+    assert.ok(captured.some((s) => s.includes('已导出')), 'should print export success');
+    assert.ok(captured.some((s) => s.includes('发给团队管理员')), 'should print export hint');
     assert.ok(captured.some((s) => s.includes('主菜单选 2 装到他们电脑')), 'should print install hint');
   } finally {
     console.log = origLog;
-    if (origHome === undefined) delete process.env.OPSFORGE_HOME; else process.env.OPSFORGE_HOME = origHome;
   }
 });
 
-// OP22 cmdSubmitFlow 无草稿打印提示并返回 0。
-test('OP22 cmdSubmitFlow no drafts prints hint', async () => {
-  const { cmdSubmitFlow } = await import('./opsforge.mjs');
+// OP22 cmdExportFlow 无草稿打印提示并返回 0。
+test('OP22 cmdExportFlow no drafts prints hint', async () => {
+  const { cmdExportFlow } = await import('./opsforge.mjs');
   const captured = [];
   const origLog = console.log;
   console.log = (s) => captured.push(String(s));
   try {
     const rl = mockRl([]);
-    const code = await cmdSubmitFlow(rl, { workDir: mkTmp(), listDrafts: () => [] });
+    const code = await cmdExportFlow(rl, { workDir: mkTmp(), listDrafts: () => [] });
     assert.equal(code, 0);
     assert.ok(captured.some((s) => s.includes('没有本地草稿')));
   } finally {
@@ -661,36 +653,36 @@ test('OP22 cmdSubmitFlow no drafts prints hint', async () => {
   }
 });
 
-// OP23 cmdSubmitFlow hasFillMe 警告 + 选 N 取消。
-test('OP23 cmdSubmitFlow hasFillMe warning and N cancels', async () => {
-  const { cmdSubmitFlow } = await import('./opsforge.mjs');
+// OP23 cmdExportFlow hasFillMe 警告 + 选 N 取消。
+test('OP23 cmdExportFlow hasFillMe warning and N cancels', async () => {
+  const { cmdExportFlow } = await import('./opsforge.mjs');
   const tmp = mkTmp();
   const draftPath = path.join(tmp, 'foo', 'bar');
   fs.mkdirSync(draftPath, { recursive: true });
   const captured = [];
   const origLog = console.log;
   console.log = (s) => captured.push(String(s));
-  let submitCalled = false;
+  let exportCalled = false;
   try {
     const rl = mockRl(['1', 'n']);
-    const code = await cmdSubmitFlow(rl, {
+    const code = await cmdExportFlow(rl, {
       workDir: tmp,
       listDrafts: () => [{ slug: 'foo', name: 'bar', kind: 'skill', path: draftPath, mtime: Date.now(), hasFillMe: true }],
-      submit: async () => { submitCalled = true; return { prUrl: 'x', branch: 'b', commitSha: 'c', updated: false }; },
+      exportFn: async () => { exportCalled = true; return { zipPath: '/tmp/x.zip', zipName: 'x', cap: {} }; },
     });
     assert.equal(code, 0);
-    assert.equal(submitCalled, false, 'submit should NOT be called on cancel');
+    assert.equal(exportCalled, false, 'export should NOT be called on cancel');
     assert.ok(captured.some((s) => s.includes('未填项')));
   } finally {
     console.log = origLog;
   }
 });
 
-// OP24 printSubmitHint 文案含"主菜单选 9"（守则：无禁用词）。
-test('OP24 printSubmitHint prints business hint with menu 9', async () => {
+// OP24 printExportHint 文案含"主菜单选 9"（守则：无禁用词）。
+test('OP24 printExportHint prints business hint with menu 9', async () => {
   const { cmdPrint } = await import('./opsforge.mjs');
   const captured = [];
-  await cmdPrint(['submit-hint'], { out: (s) => captured.push(s) });
+  await cmdPrint(['export-hint'], { out: (s) => captured.push(s) });
   const text = captured.join('\n');
   assert.match(text, /主菜单选 9/);
 });

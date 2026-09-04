@@ -119,8 +119,9 @@ node install.mjs --list | --install <pack>.<name>@<version> | --repair | --downg
 | `opsforge-meta.opsforge` | OpsForge 主菜单 | agent | claude-code(T1) · workbuddy(T2) | 非技术运营同学首次接触 OpsForge 的入口 | 已发布 | 1.0.0 |
 | `opsforge-meta.opsforge-installer` | OpsForge 安装器 | agent | claude-code(T1) · workbuddy(T2) | 新机器首次把 OpsForge 装进 agent 平台 | 已发布 | 1.0.0 |
 | `data-team.data-quality-profiler` | 数据库数据质量体检 | skill | claude-code(T1) · workbuddy(T2) | CRM 分析项目启动前，对客户业务库做首次数据质量摸底 | 已发布 | 0.2.0 |
+| `opsforge-meta.capability-wizard` | 能力创建向导 | skill | claude-code(T1) · codex(T1) · workbuddy(T2) | 业务运营同学想自动化一项重复工作，但不确定该做成什么类型 | 正式 | 1.0.0 |
 | `opsforge-meta.opsforge-interview` | OpsForge 访谈 | skill | claude-code(T1) · workbuddy(T2) | 非 claude-code 平台作者无法 @-invoke capability-interviewer agent | 已发布 | 1.0.0 |
-| `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) · workbuddy(T2) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
+| `opsforge-meta.opsforge-wizard` | OpsForge 向导 | skill | claude-code(T1) · codex(T1) · workbuddy(T2) | 业务运营同学零代码创建能力 | 已发布 | 1.0.0 |
 | `third-party.anydoc` | AnyDoc 文档转 Markdown | skill | claude-code(T1) | 把收到的 Word 方案、Excel 报表、PDF 报告转成 Markdown，交给 AI 做摘要、翻译或二次加工 | 已发布 | 0.1.0 |
 | `third-party.diagram-design` | 编辑风图表设计 | skill | claude-code(T1) | 把流程、架构、思路画成图：流程图、层级图、对比图、关系图 | 已发布 | 0.1.0 |
 | `third-party.marketingskills` | AI 代理营销技能包 | skill | claude-code(T1) · workbuddy(T2) | 技术营销人员或创始人想让 AI 编码代理代写落地页文案、邮件序列、社媒帖、广告创意 | 已发布 | 0.1.0 |

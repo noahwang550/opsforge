@@ -36,33 +36,32 @@ const PRINT_TOPICS = {
     '  6) 反馈（给能力打分）',
     '  7) 浏览仓库全部能力（清单 + 适用场景）',
     '  8) 打开能力目录（浏览器，搜索/筛选全部能力）',
-    '  9) 提交我的能力到能力仓（让其他人能下载）',
+    '  9) 导出能力（打包下载，发给团队管理员）',
     '  0) 退出',
     '----------------------------------------',
   ].join('\n'),
   'new-flow': [
     '--- 新建能力 ---',
     '推荐：走访谈→蒸馏→跑通五期，LLM 先生成草稿、你只勾选确认。',
-    '  ① 调出 @capability-interviewer（或用 opsforge-interview 纯 prompt 脚本）',
-    '  ② 直接脚手架（逃生路径：只问 kind/name/slug，自己填空模板）',
-    '  ③ 收录第三方能力（粘贴来源网址，自动收录）',
+    '  ① 调出 @capability-wizard（统一能力创建向导，自动判断类型）',
+    '  ② 收录第三方能力（粘贴来源网址，自动收录）',
   ].join('\n'),
   'wizard-routing': [
     'OpsForge 向导 — 引导式创建能力',
-    '推荐先走访谈员 @capability-interviewer（五期：访谈→蒸馏→跑通→迭代），LLM 引导式沉淀。',
-    '  ① 调出 @capability-interviewer  ② 直接脚手架（逃生路径）',
+    '推荐使用 @capability-wizard（统一能力创建向导，自动判断类型+引导全流程）。',
+    '  ① 调出 @capability-wizard  ② 收录第三方能力',
   ].join('\n'),
   'push-reminder': '📌 提醒：能力有改动后，记得推送云端仓库（或者让我帮你推）——不然团队其他人看不到。',
   'catalog-hint': '想看这能力的详情？主菜单选 8 打开能力目录。',
   'discover-remote-hint': '想看全部能力？主菜单选 8 打开能力目录，或直接跑 opsforge discover。',
-  'submit-hint': '建好了？回主菜单选 9 一键提交到能力仓（让其他人能下载）。',
-  'submit-flow': [
-    '--- 提交我的能力到能力仓 ---',
-    '把本地草稿提交成中心仓库的提交，运营团队审核通过后其他人就能装。',
+  'export-hint': '建好了？回主菜单选 9 导出能力打包下载（发给团队管理员导入）。',
+  'export-flow': [
+    '--- 导出能力 ---',
+    '把本地草稿打包成标准格式压缩包，发给团队管理员导入能力仓库。',
   ].join('\n'),
   'error-recovery': '[黄] <msg>\n可能原因：<reason>\n下一步：<next-step>\n已返回主菜单。',
   'distiller-steps': 'Step ① · Shape inference + C12 mapping: read `_drafts/<slug>/interview.md` `## 流程实录`. Infer the kind with rationale.\nStep ② · Scaffold: `Bash: node tools/new-capability.mjs --kind <推断kind> --slug <slug> --name <name>`.\nStep ③ · Overwrite business fields + dual artifacts: Write the full body in **one** call (all H2 sections + dual artifacts).\nStep ④ · Field defaults author-confirm: give quadrant/source/confidence/allow_exact_reason defaults per case.\nStep ⑤ · `Bash: opsforge set-phase <capDir> distill_done`.',
-  'wizard-phases': 'Phase 1 · 访谈期: invoke @capability-interviewer (claude-code) or paste opsforge-interview pure-prompt skill (Tier 2/3). Produces _drafts/<slug>/interview.md.\nPhase 2 · 蒸馏期: invoke @capability-distiller. Reads interview.md, infers kind, scaffolds, overwrites body + dual artifacts, calls set-phase distill_done.\nPhase 3 · 跑通期: run structure gate + run-light gate (test-runner.mjs dry-run ≥2 cases). Render two-tier light via report-renderer.mjs.\nPhase 4 · 迭代期: passive evolve trigger (feedback≤2 or 3rd discover/doctor call → suggest opsforge evolve).',
+  'wizard-phases': 'Phase 1 · 访谈期: invoke @capability-wizard (claude-code) or use capability-wizard skill (Tier 2/3). Produces _drafts/<slug>/interview.md.\nPhase 2 · 蒸馏期: invoke @capability-distiller. Reads interview.md, infers kind, scaffolds, overwrites body + dual artifacts, calls set-phase distill_done.\nPhase 3 · 跑通期: run structure gate + run-light gate (test-runner.mjs dry-run ≥2 cases). Render two-tier light via report-renderer.mjs.\nPhase 4 · 迭代期: passive evolve trigger (feedback≤2 or 3rd discover/doctor call → suggest opsforge evolve).',
 };
 
 /**
@@ -203,7 +202,7 @@ export async function cmdMenu(rl, opts = {}) {
         case '6': await cmdFeedback(rl, opts); break;
         case '7': await cmdDiscover({ ...opts, all: true }); break;
         case '8': await cmdCatalogFlow(rl, opts); break;
-        case '9': await cmdSubmitFlow(rl, opts); break;
+        case '9': await cmdExportFlow(rl, opts); break;
         default:
           console.log('没看懂这个选项，请输入 0 到 9 之间的数字。');
       }
@@ -214,35 +213,22 @@ export async function cmdMenu(rl, opts = {}) {
   }
 }
 
-/** 菜单分支 1：新建能力。methodology §3：默认路由到 @capability-interviewer
- *  （访谈→蒸馏→跑通五期，LLM 引导式沉淀）；保留 promptNew 直跑 scaffold 作逃生路径（J.12）。
- *  Phase 4 追加 ③：收录第三方能力（git → intake），走 intake.mjs 治理路径。 */
+/** 菜单分支 1：新建能力。methodology §3：默认路由到 @capability-wizard
+ *  （访谈→蒸馏→跑通五期，LLM 引导式沉淀）。
+ *  Phase 4 追加 ②：收录第三方能力（git → intake），走 intake.mjs 治理路径。 */
 async function cmdNewFlow(rl, opts = {}) {
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
   console.log(PRINT_TOPICS['new-flow']);
-  const ch = (await ask('选 [1-3]（回车=①）: ')).trim() || '1';
-  if (ch === '3') {
+  const ch = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
+  if (ch === '2') {
     return await cmdIntakeFlow(rl, opts);
   }
   if (ch !== '2') {
-    console.log('请调出 @capability-interviewer（claude-code 形态）；非 claude-code 平台把');
-    console.log('packs/opsforge-meta/skills/opsforge-interview/SKILL.md 内容贴到任意 LLM 跑一遍，');
+    console.log('请调出 @capability-wizard（claude-code 形态）；非 claude-code 平台把');
+    console.log('packs/opsforge-meta/skills/capability-wizard/SKILL.md 内容贴到任意 LLM 跑一遍，');
     console.log('产出 _drafts/<slug>/interview.md 后交给 @capability-distiller 蒸馏。set-phase 对你透明。');
     return 0;
   }
-  // 逃生路径：保留 promptNew（向后兼容 + 测试可能依赖，J.12）
-  const o = await promptNew(rl);
-  const { scaffold } = await import('./new-capability.mjs');
-  const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
-  const result = scaffold({
-    kind: o.kind, slug: o.slug, name: o.name, brand: o.brand,
-    root: workDir,
-    templatesDir: path.resolve(__dirname, '..', 'templates'),
-  });
-  console.log(`绿 已创建: ${result.destPath}`);
-  console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
-  printSubmitHint();
-  printCatalogHint();
 }
 
 /** 能力创建/收录收尾统一提醒：别忘了推送云端仓库（B2 会话级提醒）。 */
@@ -255,9 +241,9 @@ export function printCatalogHint() {
   console.log(PRINT_TOPICS['catalog-hint']);
 }
 
-/** A2: 业务指引——指向一键提交（主菜单选 9）。保留向后兼容。 */
-export function printSubmitHint() {
-  console.log(PRINT_TOPICS['submit-hint']);
+/** A2: 业务指引——指向能力导出（主菜单选 9）。 */
+export function printExportHint() {
+  console.log(PRINT_TOPICS['export-hint']);
 }
 
 /**
@@ -317,17 +303,16 @@ export async function cmdCatalogFlow(rl, opts = {}) {
 }
 
 /**
- * cmdSubmitFlow(rl, opts) — 菜单分支 9：一键提交本地草稿到中心仓库。
- * listDrafts → 选 → 预检（§A+§B+static-only tests）→ 贡献码（首次引导）→
- * submit() → 业务话结果。文案全守则化（提交进度页/运营团队审核/主菜单选 2 装到他们电脑）。
+ * cmdExportFlow(rl, opts) — 菜单分支 9：导出能力打包下载。
+ * listDrafts → 选 → 预检（§A+§B+static-only tests）→ exportCapability() → 业务话结果。
  * @param {readline.Interface} rl
- * @param {{opsforgeHome?: string, workDir?: string, listDrafts?: Function, submit?: Function}} opts
+ * @param {{opsforgeHome?: string, workDir?: string, listDrafts?: Function, exportFn?: Function}} opts
  * @returns {Promise<number>}
  */
-export async function cmdSubmitFlow(rl, opts = {}) {
+export async function cmdExportFlow(rl, opts = {}) {
   const ask = (q) => new Promise((r) => rl.question(q, r));
   const workDir = opts.workDir || resolveWorkDir({ opsforgeHome: opts.opsforgeHome }).dir;
-  console.log(PRINT_TOPICS['submit-flow']);
+  console.log(PRINT_TOPICS['export-flow']);
   const { listDrafts } = await import('./paths.mjs');
   const listFn = opts.listDrafts || listDrafts;
   const drafts = listFn(workDir);
@@ -339,9 +324,9 @@ export async function cmdSubmitFlow(rl, opts = {}) {
   drafts.forEach((d, i) => {
     const mtime = new Date(d.mtime).toLocaleString('zh-CN');
     const fill = d.hasFillMe ? ' [黄 还有未填项]' : '';
-    console.log(`  ${i + 1}) ${d.slug}.${d.name}  (${d.kind})  ${mtime}${fill}`);
+    console.log('  ' + (i + 1) + ') ' + d.slug + '.' + d.name + '  (' + d.kind + ')  ' + mtime + fill);
   });
-  const sel = (await ask('选择要提交的序号（回车取消）: ')).trim();
+  const sel = (await ask('选择要导出的序号（回车取消）: ')).trim();
   if (!sel) { console.log('已取消。'); return 0; }
   const idx = Number(sel) - 1;
   if (!Number.isInteger(idx) || idx < 0 || idx >= drafts.length) {
@@ -350,48 +335,39 @@ export async function cmdSubmitFlow(rl, opts = {}) {
   }
   const draft = drafts[idx];
   if (draft.hasFillMe) {
-    console.log('黄 这个草稿还有未填项（标记 __FILL_ME__）。建议先填完再提交。');
-    if ((await ask('仍要提交？[y/N]: ')).trim().toLowerCase() !== 'y') {
+    console.log('黄 这个草稿还有未填项（标记 __FILL_ME__）。建议先填完再导出。');
+    if ((await ask('仍要导出？[y/N]: ')).trim().toLowerCase() !== 'y') {
       console.log('已取消。');
       return 0;
     }
   }
-  const { readSubmitToken, writeSubmitToken, PreflightError } = await import('./submit.mjs');
-  let token = readSubmitToken()?.token;
-  if (!token) {
-    console.log('首次使用：请联系团队管理员领取『贡献码』，粘贴在下面（只需一次）：');
-    token = (await ask('贡献码: ')).trim();
-    if (!token) { console.log('未输入贡献码，已取消。'); return 1; }
-    writeSubmitToken(token);
-  }
-  const submitFn = opts.submit || (await import('./submit.mjs')).submit;
+  const exportFn = opts.exportFn || (await import('./export.mjs')).exportCapability;
+  const { ExportError } = await import('./export.mjs');
   try {
-    console.log('正在提交…');
-    const r = await submitFn({ draftDir: draft.path, repoRoot: workDir, token });
-    const verb = r.updated ? '已更新原提交' : '已提交';
-    console.log(`绿 ${verb}！提交进度页：${r.prUrl}`);
-    console.log('运营团队会审核，通过后其他人就能在主菜单选 2 装到他们电脑。');
+    console.log('正在导出…');
+    const r = await exportFn({ draftDir: draft.path, repoRoot: workDir });
+    console.log('绿 已导出！文件：' + r.zipPath);
+    console.log('把这个压缩包发给团队管理员，管理员会导入到能力仓库，其他人就能在主菜单选 2 装到他们电脑。');
     printCatalogHint();
   } catch (e) {
-    if (e instanceof PreflightError) {
+    if (e instanceof ExportError) {
       if (e.kind === 'tests') {
-        // M3：test-runner 报告结构与 eval-report 不同，不走 render()，直接业务话。
         const fail = e.report && typeof e.report.fail === 'number' ? e.report.fail : '?';
-        console.log(`[红] 预检没过：测试有 ${fail} 项没通过，请改完再回主菜单选 9 重新提交。`);
+        console.log('[红] 预检没过：测试有 ' + fail + ' 项没通过，请改完再回主菜单选 9 重新导出。');
       } else {
         const typeMap = { validation: 'validation-report', security: 'security-report' };
         const r = render(e.report, typeMap[e.kind] || 'validation-report', { lang: 'zh' });
-        console.log(`[红] 预检没过：${r.oneLiner}`);
-        console.log('请按上面的修复指引改完，再回主菜单选 9 重新提交。');
+        console.log('[红] 预检没过：' + r.oneLiner);
+        console.log('请按上面的修复指引改完，再回主菜单选 9 重新导出。');
       }
     } else {
-      console.log(`[红] ${e.message}`);
+      console.log('[红] ' + e.message);
     }
   }
   return 0;
 }
 
-/** 菜单分支 1③：收录第三方能力（git → intake）。
+/** 菜单分支 1②：收录第三方能力（git → intake）。
  *  走 intake.mjs 完整治理路径：clone（SSRF + shell-metachar 拒绝 + 50MB 上限）
  *  → LICENSE 允许清单 → new-capability --third-party 草稿 → upstream-ref.json。 */
 export async function cmdIntakeFlow(rl, opts = {}) {
@@ -418,7 +394,7 @@ export async function cmdIntakeFlow(rl, opts = {}) {
     const r = await intake({ repoUrl, license, kind, name, owner, repoRoot: workDir, scope });
     console.log(`绿 已收录: ${r.draftPath} @${r.commit}（${r.sizeBytes === null ? 'reference scope' : r.sizeBytes + ' bytes'}）`);
     console.log('下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后回主菜单选 5 查看报告。');
-    printSubmitHint();
+    printExportHint();
     printCatalogHint();
     return 0;
   } catch (e) {
@@ -464,7 +440,7 @@ export async function cmdWizard(rl, opts = {}) {
   console.log(PRINT_TOPICS['wizard-routing']);
   const route = (await ask('选 [1-2]（回车=①）: ')).trim() || '1';
   if (route !== '2') {
-    console.log('请调出 @capability-interviewer；非 claude-code 平台用 opsforge-interview 纯 prompt 脚本。');
+    console.log('请调出 @capability-wizard；非 claude-code 平台用 capability-wizard skill。');
     console.log('产出 _drafts/<slug>/interview.md 后交给 @capability-distiller 蒸馏。');
     return 0;
   }
@@ -486,7 +462,7 @@ export async function cmdWizard(rl, opts = {}) {
   console.log(`下一步: 填写业务字段（标记 __FILL_ME__ 的位置），然后运行:`);
   console.log(`  node tools/validate.mjs ${result.destPath}`);
   console.log(`  opsforge status ${result.destPath}`);
-  printSubmitHint();
+  printExportHint();
   printCatalogHint();
   return 0;
 }

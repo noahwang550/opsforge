@@ -1,0 +1,11 @@
+name: complex-workflow-routing
+input:
+  kind: agent
+  name: 只有一步的简单任务
+expect: contains
+expected: 单一 Skill
+quadrant: boundary
+source: recalled
+confidence: med
+allow_exact_reason: null
+ref: null
